@@ -1,0 +1,9 @@
+cloudflare_r2.json
+
+# Temporary files
+*__pycache__/
+.DS_Store
+
+
+*.txt
+

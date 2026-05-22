@@ -1,0 +1,8 @@
+{
+    "rclone_remote": "enter-rclone-remote-name-here",
+    "bucket_name": "enter-bucket-name-here",
+    "local_dir": "enter-local-directory-here",
+    "account_id": "enter-account-id-here",
+    "access_key_id": "enter-access-key-id-here",
+    "secret_access_key": "enter-secret-access-key-here"
+}
