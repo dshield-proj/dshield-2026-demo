@@ -1,3 +1,39 @@
+"""
+This module provides functions to set up rclone remotes for
+Cloudflare R2 and to sync buckets according to the configuration
+in cloudflare_r2.json.
+
+`cloudflare_r2.json` uses two sets of API tokens — one for buckets with read-write access,
+one for read-only buckets:
+
+```jsonc
+{
+    "account_id": "...",          // shared Cloudflare account ID
+
+    "read_write": {
+        "rclone_remote": "r2-rw", // name for the rclone remote
+        "access_key_id": "...",
+        "secret_access_key": "...",
+        "buckets": [
+            { "bucket_name": "my-bucket-1", "local_dir": "/data/bucket1" },
+            ...                   // one entry per read-write bucket
+        ]
+    },
+
+    "read_only": {
+        "rclone_remote": "r2-ro",
+        "access_key_id": "...",
+        "secret_access_key": "...",
+        "buckets": [
+            { "bucket_name": "my-bucket-4", "local_dir": "/data/bucket4" },
+            ...                   // one entry per read-only bucket
+        ]
+    }
+}
+```
+
+"""
+import configparser
 import json
 import subprocess
 import sys
@@ -11,60 +47,83 @@ def load_config(config_path="cloudflare_r2.json"):
         sys.exit(1)
     with path.open() as f:
         cfg = json.load(f)
-    required = {"rclone_remote", "bucket_name", "local_dir", "account_id", "access_key_id", "secret_access_key"}
-    missing = required - cfg.keys()
-    if missing:
-        print(f"Missing keys in config: {missing}", file=sys.stderr)
-        sys.exit(1)
+
+    # Validate top-level keys
+    for key in ("account_id", "read_write", "read_only"):
+        if key not in cfg:
+            print(f"Missing top-level key in config: '{key}'", file=sys.stderr)
+            sys.exit(1)
+
+    # Validate each token-set section
+    for section in ("read_write", "read_only"):
+        sec = cfg[section]
+        for key in ("rclone_remote", "access_key_id", "secret_access_key", "buckets"):
+            if key not in sec:
+                print(f"Missing key '{key}' in config['{section}']", file=sys.stderr)
+                sys.exit(1)
+        for i, bucket in enumerate(sec["buckets"]):
+            for key in ("bucket_name", "local_dir"):
+                if key not in bucket:
+                    print(
+                        f"Missing key '{key}' in config['{section}']['buckets'][{i}]",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+
     return cfg
 
 
 _cfg = load_config()
 
-RCLONE_REMOTE = _cfg["rclone_remote"]
-BUCKET_NAME = _cfg["bucket_name"]
-LOCAL_DIR = _cfg["local_dir"]
 
-# Full remote path
-REMOTE_PATH = f"{RCLONE_REMOTE}:{BUCKET_NAME}"
-
-
-def setup_rclone_remote():
-    """Configure the rclone remote from cloudflare_r2.json.
-
-    Uses configparser to read and write rclone.conf so that any other remotes
-    already present (e.g. Google Drive, AWS S3) are preserved. Only the target
-    remote section is added or updated; the rest of the file is left untouched.
-    If the stored credentials already match the config, the file is not rewritten.
-    """
-    import configparser
-
-    rclone_conf = Path.home() / ".config" / "rclone" / "rclone.conf"
-    rclone_conf.parent.mkdir(parents=True, exist_ok=True)
-
+def _setup_remote(parser, remote_name, account_id, access_key_id, secret_access_key):
+    """Add or update a single rclone remote section. Returns True if a write is needed."""
     desired = {
         "type": "s3",
         "provider": "Cloudflare",
-        "access_key_id": _cfg["access_key_id"],
-        "secret_access_key": _cfg["secret_access_key"],
-        "endpoint": f"https://{_cfg['account_id']}.r2.cloudflarestorage.com",
+        "access_key_id": access_key_id,
+        "secret_access_key": secret_access_key,
+        "endpoint": f"https://{account_id}.r2.cloudflarestorage.com",
     }
+    if remote_name in parser and dict(parser[remote_name]) == desired:
+        print(f"rclone remote '{remote_name}' is up to date, skipping.")
+        return False
+    action = "Updated" if remote_name in parser else "Created"
+    parser[remote_name] = desired
+    print(f"{action} rclone remote '{remote_name}'.")
+    return True
+
+
+def setup_rclone_remotes():
+    """Configure both rclone remotes (read-write and read-only) from cloudflare_r2.json.
+
+    Uses configparser so that unrelated remotes already present in rclone.conf
+    are preserved. Only the two managed sections are added or updated.
+    """
+    rclone_conf = Path.home() / ".config" / "rclone" / "rclone.conf"
+    rclone_conf.parent.mkdir(parents=True, exist_ok=True)
 
     parser = configparser.ConfigParser()
     if rclone_conf.exists():
         parser.read(rclone_conf)
 
-    if RCLONE_REMOTE in parser and dict(parser[RCLONE_REMOTE]) == desired:
-        print(f"rclone remote '{RCLONE_REMOTE}' is up to date, skipping.")
-        return
+    account_id = _cfg["account_id"]
+    changed = False
+    for section in ("read_write", "read_only"):
+        sec = _cfg[section]
+        changed |= _setup_remote(
+            parser,
+            sec["rclone_remote"],
+            account_id,
+            sec["access_key_id"],
+            sec["secret_access_key"],
+        )
 
-    action = "Updated" if RCLONE_REMOTE in parser else "Created"
-    parser[RCLONE_REMOTE] = desired
-
-    with rclone_conf.open("w") as f:
-        parser.write(f)
-    rclone_conf.chmod(0o600)
-    print(f"{action} rclone remote '{RCLONE_REMOTE}' in {rclone_conf}")
+    if changed:
+        with rclone_conf.open("w") as f:
+            parser.write(f)
+        rclone_conf.chmod(0o600)
+        print(f"rclone.conf written to {rclone_conf}")
 
 
 def run_rclone(command, *args):
@@ -74,4 +133,46 @@ def run_rclone(command, *args):
     if result.returncode != 0:
         print(f"rclone exited with code {result.returncode}", file=sys.stderr)
         sys.exit(result.returncode)
+
+
+def sync_rw_buckets():
+    """Sync each read-write bucket: local directory → remote bucket.
+
+    Uses 'rclone sync', so files deleted locally are also removed from the bucket.
+    Aborts if a local directory does not exist to prevent accidentally wiping the
+    remote bucket with an empty source.
+    """
+    sec = _cfg["read_write"]
+    remote = sec["rclone_remote"]
+    for bucket in sec["buckets"]:
+        local = bucket["local_dir"]
+        remote_path = f"{remote}:{bucket['bucket_name']}"
+        if not Path(local).exists():
+            print(
+                f"[read-write] Aborting: local directory does not exist: {local}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print(f"\n[read-write] {local}  →  {remote_path}")
+        run_rclone("sync", local, remote_path)
+
+
+def sync_ro_buckets():
+    """Download each read-only bucket: remote bucket → local directory.
+
+    Uses 'rclone copy' so the remote is never modified. The local directory is
+    created automatically if it does not exist.
+
+    Note on local edits: any local file that also exists in the remote bucket
+    will be overwritten if its content differs from the remote version. Local
+    files that have no counterpart in the remote are left untouched, since
+    'rclone copy' never deletes files from the destination.
+    """
+    sec = _cfg["read_only"]
+    remote = sec["rclone_remote"]
+    for bucket in sec["buckets"]:
+        local = bucket["local_dir"]
+        remote_path = f"{remote}:{bucket['bucket_name']}"
+        print(f"\n[read-only]  {remote_path}  →  {local}")
+        run_rclone("copy", remote_path, local)
 

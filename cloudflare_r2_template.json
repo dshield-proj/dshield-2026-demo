@@ -1,8 +1,27 @@
 {
-    "rclone_remote": "enter-rclone-remote-name-here",
-    "bucket_name": "enter-bucket-name-here",
-    "local_dir": "enter-local-directory-here",
     "account_id": "enter-account-id-here",
-    "access_key_id": "enter-access-key-id-here",
-    "secret_access_key": "enter-secret-access-key-here"
+    "read_write": {
+        "rclone_remote": "r2-rw",
+        "access_key_id": "enter-rw-access-key-id-here",
+        "secret_access_key": "enter-rw-secret-access-key-here",
+        "buckets": [
+            {"bucket_name": "enter-bucket-name-1", "local_dir": "enter-local-dir-1"},
+            {"bucket_name": "enter-bucket-name-2", "local_dir": "enter-local-dir-2"},
+            {"bucket_name": "enter-bucket-name-3", "local_dir": "enter-local-dir-3"}
+        ]
+    },
+    "read_only": {
+        "rclone_remote": "r2-ro",
+        "access_key_id": "enter-ro-access-key-id-here",
+        "secret_access_key": "enter-ro-secret-access-key-here",
+        "buckets": [
+            {"bucket_name": "enter-bucket-name-4",  "local_dir": "enter-local-dir-4"},
+            {"bucket_name": "enter-bucket-name-5",  "local_dir": "enter-local-dir-5"},
+            {"bucket_name": "enter-bucket-name-6",  "local_dir": "enter-local-dir-6"},
+            {"bucket_name": "enter-bucket-name-7",  "local_dir": "enter-local-dir-7"},
+            {"bucket_name": "enter-bucket-name-8",  "local_dir": "enter-local-dir-8"},
+            {"bucket_name": "enter-bucket-name-9",  "local_dir": "enter-local-dir-9"},
+            {"bucket_name": "enter-bucket-name-10", "local_dir": "enter-local-dir-10"}
+        ]
+    }
 }
