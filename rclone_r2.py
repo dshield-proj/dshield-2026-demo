@@ -135,13 +135,8 @@ def run_rclone(command, *args):
         sys.exit(result.returncode)
 
 
-def sync_rw_buckets():
-    """Sync each read-write bucket: local directory → remote bucket.
-
-    Uses 'rclone sync', so files deleted locally are also removed from the bucket.
-    Aborts if a local directory does not exist to prevent accidentally wiping the
-    remote bucket with an empty source.
-    """
+def _rw_buckets_loop(rclone_command):
+    """Shared iteration logic for read-write bucket operations."""
     sec = _cfg["read_write"]
     remote = sec["rclone_remote"]
     for bucket in sec["buckets"]:
@@ -149,30 +144,58 @@ def sync_rw_buckets():
         remote_path = f"{remote}:{bucket['bucket_name']}"
         if not Path(local).exists():
             print(
-                f"[read-write] Aborting: local directory does not exist: {local}",
-                file=sys.stderr,
+                f"[read-write] Local directory not found — creating and seeding from remote: {local}"
             )
-            sys.exit(1)
+            Path(local).mkdir(parents=True, exist_ok=True)
+            run_rclone("copy", remote_path, local)
         print(f"\n[read-write] {local}  →  {remote_path}")
-        run_rclone("sync", local, remote_path)
+        run_rclone(rclone_command, local, remote_path)
 
 
-def sync_ro_buckets():
-    """Download each read-only bucket: remote bucket → local directory.
+def copy_rw_buckets():
+    """Upload each read-write bucket: local directory → remote bucket.
 
-    Uses 'rclone copy' so the remote is never modified. The local directory is
-    created automatically if it does not exist.
+    Uses 'rclone copy', so files deleted locally are NOT removed from the bucket.
+
+    If the local directory does not exist it is created and seeded from the remote
+    using 'rclone copy' before copying. This preserves any existing remote
+    content on first-time setup.
+    """
+    _rw_buckets_loop("copy")
+
+
+def sync_rw_buckets():
+    """Sync each read-write bucket: local directory → remote bucket.
+
+    Uses 'rclone sync', so files deleted locally are also removed from the bucket.
+    For non-destructive uploads use copy_rw_buckets() instead.
+
+    If the local directory does not exist it is created and seeded from the remote
+    using 'rclone copy' before the sync runs. This preserves any existing remote
+    content on first-time setup and avoids wiping the bucket with an empty source.
+    """
+    _rw_buckets_loop("sync")
+
+
+def sync_read_all():
+    """Download all buckets (read-only and read-write): remote → local directory.
+
+    Uses 'rclone copy' so remotes are never modified. Local directories are
+    created automatically if they do not exist.
 
     Note on local edits: any local file that also exists in the remote bucket
     will be overwritten if its content differs from the remote version. Local
     files that have no counterpart in the remote are left untouched, since
     'rclone copy' never deletes files from the destination.
     """
-    sec = _cfg["read_only"]
-    remote = sec["rclone_remote"]
-    for bucket in sec["buckets"]:
-        local = bucket["local_dir"]
-        remote_path = f"{remote}:{bucket['bucket_name']}"
-        print(f"\n[read-only]  {remote_path}  →  {local}")
-        run_rclone("copy", remote_path, local)
+    for section in ("read_only", "read_write"):
+        sec = _cfg[section]
+        remote = sec["rclone_remote"]
+        label = "read-only " if section == "read_only" else "read-write"
+        for bucket in sec["buckets"]:
+            local = bucket["local_dir"]
+            remote_path = f"{remote}:{bucket['bucket_name']}"
+            Path(local).mkdir(parents=True, exist_ok=True)
+            print(f"\n[{label}]  {remote_path}  →  {local}")
+            run_rclone("copy", remote_path, local)
 
