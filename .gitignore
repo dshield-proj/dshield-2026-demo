@@ -7,3 +7,14 @@ cloudflare_r2.json
 
 *.txt
 
+fire-arrival/*
+fire-danger/*
+pre-fire-priority/*
+fire-severity-predictor/*
+burned-area/*
+active-fire-priority/*
+soil-moisture/*
+orbits/*
+planner/*
+dshield-demo-configuration/*
+dshield-demo-bucket/*
