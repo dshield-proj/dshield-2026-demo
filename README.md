@@ -38,9 +38,22 @@ A `cloudflare_r2.json` credentials will be supplied to you seperately.
 
 1. Create a local directory named `dshield-2026-demo` to hold the data for all dshield modules.
 
-2. Copy `rclone_r2.py`, `sync_rw.py`, and `sync_read_all.py` from this repo into that directory, then place your configured `cloudflare_r2.json` there as well.
+2. Copy `rclone_r2.py`, `sync_rw.py`, `sync_read_all.py`, and `setup.py` from this repo into that directory, then place your configured `cloudflare_r2.json` there as well.
 
-3. The data of the respective modules will sit in the below named folders, and the directory stucture will look like as shown below.
+3. Configure the rclone remotes (only needed once per machine):
+
+```bash
+python setup.py
+```
+(If the credentials change, then `setup.py` will need to be re-run.)
+
+4. Read the existing data from remote to your local drive (within the `dshield-2026-demo` directory)
+
+```bash
+python sync_read_all.py
+```
+
+5. The data of the respective modules will sit in the below named folders, and the directory stucture will look like as shown below.
 
 ```
 dshield-2026-demo/
@@ -54,24 +67,29 @@ dshield-2026-demo/
 ├── planner/
 ├── pre-fire-priority/
 ├── soil-moisture/
-├
 ├── cloudflare_r2.json
 ├── rclone_r2.py
+├── setup.py
 ├── sync_rw.py
 └── sync_read_all.py
 ```
 
+
+
+
 ### Usage during the demo 
 
-1. Download the latest data from all buckets (read-only and read-write), including the daily configuration file from `dshield-demo-configuration/`:
+1. Refresh the latest data from all buckets (read-only and read-write).
 
 ```bash
 python sync_read_all.py
 ```
 
-2. Open the configuration file correspoding to the day from `dshield-demo-configuration/` (e.g. on 2026-04-24 refer to `dshield_demo_config_20260424.json`). A new file is produced for each day and shared across all users. It specifies the output path each module should write to:
+2. Open the configuration file corresponding to the day from `dshield-demo-configuration/` bucket. E.g. on 2026-04-24 refer to `dshield_demo_config_20260424.json`. A new file is produced for each day and posted in the bucket. It specifies the output path each module should write to:
 
 ```json
+dshield_demo_config_20260424.json
+---------------------------------
 {
   "scenario_info": {
     "scenario_id": "scenario1",
