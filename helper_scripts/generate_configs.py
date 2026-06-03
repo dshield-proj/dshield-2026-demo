@@ -45,6 +45,7 @@ def generate_config(sim_start: datetime, today: datetime, day_number: int,
         },
         "outputs": {
             "soil_moisture":        f"/soil-moisture/output/{fmt(lagged)}/",
+            "burned_area_config":   f"/dshield-demo-configuration/burned-area-config/{fmt(lagged)}/",
             "burned_area":          f"/burned-area/output/{fmt(lagged)}/",
             "fire_arrival":         f"/fire-arrival/output/{fmt(lagged)}/",
             "fire_danger":          f"/fire-danger/output/{fmt(today)}/",
@@ -68,7 +69,7 @@ def generate_config(sim_start: datetime, today: datetime, day_number: int,
 
 def main():
     sim_start = datetime.strptime(SIM_START_DATE, "%Y%m%d")
-    out_dir = Path(__file__).parent / "dshield-demo-configuration"
+    out_dir = Path(__file__).parent / ".." / "dshield-demo-configuration"
     out_dir.mkdir(exist_ok=True)
 
     for day_number in range(N):
