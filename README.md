@@ -82,7 +82,13 @@ dshield-2026-demo/
 1. Refresh the latest data from all buckets (read-only and read-write).
 
 ```bash
-python sync_read_all.py
+python sync_read.py --all
+```
+
+To refresh only one bucket:
+
+```bash
+python sync_read.py burned-area
 ```
 
 2. Open the configuration file corresponding to the day from `dshield-demo-configuration/` bucket. E.g. on 2026-04-24 refer to `dshield_demo_config_20260424.json`. A new file is produced for each day and posted in the bucket. It specifies the output path each module should write to:
@@ -116,12 +122,18 @@ dshield_demo_config_20260424.json
 4. Upload your results to the remote bucket:
 
 ```bash
-python sync_rw.py
+python sync_rw.py fire-arrival
+```
+
+To upload all read-write buckets:
+
+```bash
+python sync_rw.py --all
 ```
 By default files deleted locally are **not** deleted in remote.
 
 To also delete files from the remote bucket that no longer exist locally, pass `--delete`:
 
 ```bash
-python sync_rw.py --delete
+python sync_rw.py fire-arrival --delete
 ```
