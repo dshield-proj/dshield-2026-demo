@@ -127,7 +127,7 @@ def setup_rclone_remotes():
 
 
 def run_rclone(command, *args):
-    cmd = ["rclone", command, *args, "--progress", "--verbose"]
+    cmd = ["rclone", command, *args, "--exclude", "/.**", "--exclude", "**/.**", "--progress", "--verbose"]
     print(f"Running: {' '.join(cmd)}\n")
     result = subprocess.run(cmd, text=True)
     if result.returncode != 0:
