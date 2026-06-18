@@ -12,19 +12,43 @@ Parameters:
                         (pre_fire_priority, active_fire_priority, orbits, planner).
 
 Output:
-    Files are written to dshield-demo-configuration/dshield-demo-config-YYYYMMDD.json
-    relative to the script's directory.
+    Files are written relative to the script's directory:
+      dshield-demo-configuration/dshield-demo-config-YYYYMMDD.json
+      dshield-demo-configuration/soil-moisture-config/YYYYMMDD/sm_areas.json
 """
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
 # --- Parameters ---
-SIM_START_DATE = "20260527"   # YYYYMMDD
+SIM_START_DATE = "20260618"   # YYYYMMDD
 N = 25                        # number of days to generate
 CYGNSS_LATENCY = 3            # days
 FORECAST_PERIOD = 2           # days
 # ------------------
+
+# Static per-area definitions for sm_areas.json. The date-dependent fields
+# (prod_start_date / prod_end_date) are filled in per day in generate_sm_areas().
+SM_AREAS = [
+    {
+        "name": "NM",
+        "area_id": 1,
+        "lat_upper": 32.7526999999999973,
+        "lat_lower": 32.2224999999999966,
+        "lon_upper": -106.0737000000000023,
+        "lon_lower": -107.1580000000000013,
+        "output_filename": "soil_moisture_area_id_1.tif",
+    },
+    {
+        "name": "TX_panhandle",
+        "area_id": 2,
+        "lat_upper": 36.5923980000000029,
+        "lat_lower": 35.1442180000000022,
+        "lon_upper": -99.3226980000000026,
+        "lon_lower": -102.7631460000000061,
+        "output_filename": "soil_moisture_area_id_2.tif",
+    },
+]
 
 
 def generate_config(sim_start: datetime, today: datetime, day_number: int,
@@ -44,27 +68,33 @@ def generate_config(sim_start: datetime, today: datetime, day_number: int,
             "sim_day_number": day_number,
         },
         "outputs": {
-            "soil_moisture":        f"/soil-moisture/output/{fmt(lagged)}/",
-            "burned_area_config":   f"/dshield-demo-configuration/burned-area-config/{fmt(lagged)}/",
-            "burned_area":          f"/burned-area/output/{fmt(lagged)}/",
-            "fire_arrival":         f"/fire-arrival/output/{fmt(lagged)}/",
+            "soil_moisture_config": f"/dshield-demo-configuration/soil-moisture-config/{fmt(today)}/",
+            "soil_moisture":        f"/soil-moisture/output/{fmt(today)}/",
+            "burned_area_config":   f"/dshield-demo-configuration/burned-area-config/{fmt(today)}/",
+            "burned_area":          f"/burned-area/output/{fmt(today)}/",
+            "fire_arrival":         f"/fire-arrival/output/{fmt(today)}/",
             "fire_danger":          f"/fire-danger/output/{fmt(today)}/",
             "pre_fire_priority":    f"/pre-fire-priority/output/{fmt(ahead)}/",
-            "active_fire_priority": f"/active-fire-priority/output/{fmt(ahead)}/",
+            "active_fire_priority": f"/active-fire-priority/output/{fmt(today)}/",
             "orbits":               f"/orbits/output/{fmt(ahead)}/",
             "planner":              f"/planner/output/{fmt(ahead)}/",
-        },
-        "fallback_outputs": {
-            "soil_moisture":        "/soil-moisture/sample/output/",
-            "burned_area":          "/burned-area/sample/output/",
-            "fire_arrival":         "/fire-arrival/sample/output/",
-            "fire_danger":          "/fire-danger/sample/output/",
-            "pre_fire_priority":    "/pre-fire-priority/sample/output/",
-            "active_fire_priority": "/active-fire-priority/sample/output/",
-            "orbits":               "/orbits/sample/output/",
-            "planner":              "/planner/sample/output/",
-        },
+        }
     }
+
+
+def generate_sm_areas(today: datetime, cygnss_latency: int) -> list:
+    """Build the sm_areas.json payload for a given day.
+
+    prod_start_date is lagged (today - cygnss_latency) at 00:00:00 and
+    prod_end_date is today at 23:59:59.
+    """
+    lagged = today - timedelta(days=cygnss_latency)
+    prod_start = lagged.strftime("%Y-%m-%dT00:00:00")
+    prod_end = today.strftime("%Y-%m-%dT23:59:59")
+    return [
+        {**area, "prod_start_date": prod_start, "prod_end_date": prod_end}
+        for area in SM_AREAS
+    ]
 
 
 def main():
@@ -80,6 +110,14 @@ def main():
         with filename.open("w") as f:
             json.dump(cfg, f, indent=2)
         print(f"Wrote {filename.name}")
+
+        # Per-day soil-moisture area config.
+        sm_dir = out_dir / "soil-moisture-config" / today.strftime("%Y%m%d")
+        sm_dir.mkdir(parents=True, exist_ok=True)
+        sm_file = sm_dir / "sm_areas.json"
+        with sm_file.open("w") as f:
+            json.dump(generate_sm_areas(today, CYGNSS_LATENCY), f, indent=2)
+        print(f"Wrote {sm_file.relative_to(out_dir)}")
 
     print(f"\nGenerated {N} config file(s) in {out_dir}/")
 
