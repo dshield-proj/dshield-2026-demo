@@ -127,12 +127,85 @@ def setup_rclone_remotes():
 
 
 def run_rclone(command, *args):
-    cmd = ["rclone", command, *args, "--progress", "--verbose"]
+    cmd = ["rclone", command, *args, "--exclude", "/.**", "--exclude", "**/.**", "--progress", "--verbose"]
     print(f"Running: {' '.join(cmd)}\n")
     result = subprocess.run(cmd, text=True)
     if result.returncode != 0:
         print(f"rclone exited with code {result.returncode}", file=sys.stderr)
         sys.exit(result.returncode)
+
+
+def _find_bucket(section, bucket_name):
+    """Return one configured bucket by bucket_name from the requested section."""
+    sec = _cfg[section]
+    matches = [bucket for bucket in sec["buckets"] if bucket["bucket_name"] == bucket_name]
+    if not matches:
+        print(f"Bucket '{bucket_name}' not found in config['{section}']['buckets']", file=sys.stderr)
+        sys.exit(1)
+    if len(matches) > 1:
+        print(f"Bucket '{bucket_name}' appears more than once in config['{section}']['buckets']", file=sys.stderr)
+        sys.exit(1)
+    return matches[0]
+
+
+def _copy_read_bucket(section, bucket_name):
+    """Download one configured bucket from remote to local with rclone copy."""
+    sec = _cfg[section]
+    bucket = _find_bucket(section, bucket_name)
+    remote = sec["rclone_remote"]
+    label = "read-only " if section == "read_only" else "read-write"
+    local = bucket["local_dir"]
+    remote_path = f"{remote}:{bucket['bucket_name']}"
+    Path(local).mkdir(parents=True, exist_ok=True)
+    print(f"\n[{label}]  {remote_path}  →  {local}")
+    run_rclone("copy", remote_path, local)
+
+
+def copy_read_bucket(bucket_name):
+    """Download one bucket by name from remote to local.
+
+    Read-only and read-write buckets are both downloaded with rclone copy.
+    """
+    sections = [
+        section
+        for section in ("read_only", "read_write")
+        if any(bucket["bucket_name"] == bucket_name for bucket in _cfg[section]["buckets"])
+    ]
+    if len(sections) == 1:
+        _copy_read_bucket(sections[0], bucket_name)
+        return
+    if len(sections) > 1:
+        print(f"Bucket '{bucket_name}' appears in both read-only and read-write config", file=sys.stderr)
+        sys.exit(1)
+    print(f"Bucket '{bucket_name}' not found in read-only or read-write config", file=sys.stderr)
+    sys.exit(1)
+
+
+def _copy_rw_bucket(bucket_name, rclone_command):
+    """Upload one configured read-write bucket from local to remote."""
+    sec = _cfg["read_write"]
+    remote = sec["rclone_remote"]
+    bucket = _find_bucket("read_write", bucket_name)
+    local = bucket["local_dir"]
+    remote_path = f"{remote}:{bucket['bucket_name']}"
+    if not Path(local).exists():
+        print(
+            f"[read-write] Local directory not found — creating and seeding from remote: {local}"
+        )
+        Path(local).mkdir(parents=True, exist_ok=True)
+        run_rclone("copy", remote_path, local)
+    print(f"\n[read-write] {local}  →  {remote_path}")
+    run_rclone(rclone_command, local, remote_path)
+
+
+def copy_rw_bucket(bucket_name):
+    """Upload one read-write bucket using rclone copy."""
+    _copy_rw_bucket(bucket_name, "copy")
+
+
+def sync_rw_bucket(bucket_name):
+    """Upload one read-write bucket using rclone sync."""
+    _copy_rw_bucket(bucket_name, "sync")
 
 
 def _rw_buckets_loop(rclone_command):
@@ -198,4 +271,3 @@ def sync_read_all():
             Path(local).mkdir(parents=True, exist_ok=True)
             print(f"\n[{label}]  {remote_path}  →  {local}")
             run_rclone("copy", remote_path, local)
-

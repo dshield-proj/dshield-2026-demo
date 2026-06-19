@@ -38,19 +38,23 @@ A `cloudflare_r2.json` credentials will be supplied to you seperately.
 
 1. Create a local directory named `dshield-2026-demo` to hold the data for all dshield modules.
 
-2. Copy `rclone_r2.py`, `sync_rw.py`, `sync_read_all.py`, and `setup.py` from this repo into that directory, then place your configured `cloudflare_r2.json` there as well.
+2. Copy `rclone_r2.py`, `sync_rw.py`, `sync_read.py`, `sync_read_all.py`, `setup.py`, and the matching `.sh` convenience scripts from this repo into that directory, then place your configured `cloudflare_r2.json` there as well.
 
 3. Configure the rclone remotes (only needed once per machine):
 
 ```bash
-python setup.py
+python setup.sh
 ```
-(If the credentials change, then `setup.py` will need to be re-run.)
+(If the credentials change, then the setup script will need to be re-run.)
+
+The `.sh` files are Python compatibility wrappers around the matching `.py`
+files. They can be run as `python sync_read.sh ...` on systems with a `python`
+command, or directly as `./sync_read.sh ...`.
 
 4. Read the existing data from remote to your local drive (within the `dshield-2026-demo` directory)
 
 ```bash
-python sync_read_all.py
+python sync_read_all.sh
 ```
 
 5. The data of the respective modules will sit in the below named folders, and the directory stucture will look like as shown below.
@@ -70,8 +74,13 @@ dshield-2026-demo/
 ├── cloudflare_r2.json
 ├── rclone_r2.py
 ├── setup.py
+├── setup.sh
+├── sync_read.py
+├── sync_read.sh
 ├── sync_rw.py
-└── sync_read_all.py
+├── sync_rw.sh
+├── sync_read_all.py
+└── sync_read_all.sh
 ```
 
 
@@ -82,7 +91,13 @@ dshield-2026-demo/
 1. Refresh the latest data from all buckets (read-only and read-write).
 
 ```bash
-python sync_read_all.py
+python sync_read.sh --all
+```
+
+To refresh only one bucket:
+
+```bash
+python sync_read.sh burned-area
 ```
 
 2. Open the configuration file corresponding to the day from `dshield-demo-configuration/` bucket. E.g. on 2026-04-24 refer to `dshield_demo_config_20260424.json`. A new file is produced for each day and posted in the bucket. It specifies the output path each module should write to:
@@ -116,12 +131,18 @@ dshield_demo_config_20260424.json
 4. Upload your results to the remote bucket:
 
 ```bash
-python sync_rw.py
+python sync_rw.sh fire-arrival
+```
+
+To upload all read-write buckets:
+
+```bash
+python sync_rw.sh --all
 ```
 By default files deleted locally are **not** deleted in remote.
 
 To also delete files from the remote bucket that no longer exist locally, pass `--delete`:
 
 ```bash
-python sync_rw.py --delete
+python sync_rw.sh fire-arrival --delete
 ```
