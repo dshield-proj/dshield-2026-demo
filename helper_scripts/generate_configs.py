@@ -25,9 +25,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # --- Parameters ---
-SIM_START_DATE = "20260618"   # YYYYMMDD
-N = 25                        # number of days to generate
-CYGNSS_LATENCY = 3            # days
+SIM_START_DATE = "20260625"   # YYYYMMDD
+N = 20                        # number of days to generate
+CYGNSS_LATENCY = 5            # days
 FIRE_FORECAST_PERIOD = 2      # days ahead for fire_danger / pre_fire_priority
 PLANNER_FORECAST_PERIOD = 1   # days ahead for orbits / planner
 # ------------------
@@ -80,7 +80,7 @@ def generate_config(sim_start: datetime, today: datetime, day_number: int,
             "burned_area_config":   f"/dshield-demo-configuration/burned-area-config/{fmt(today)}/",
             "burned_area":          f"/burned-area/output/{fmt(today)}/",
             "fire_arrival":         f"/fire-arrival/output/{fmt(today)}/",
-            "fire_danger":          f"/fire-danger/output/{fmt(fire_ahead)}/",
+            "fire_danger":          f"/fire-danger/output/{fmt(today)}/",
             "pre_fire_priority":    f"/pre-fire-priority/output/{fmt(fire_ahead)}/",
             "active_fire_priority": f"/active-fire-priority/output/{fmt(today)}/",
             "orbits":               f"/orbits/output/{fmt(plan_ahead)}/",
@@ -122,7 +122,7 @@ def generate_planner_config(today: datetime, planner_forecast_period: int) -> di
     return {
         "inputs": {
             "orbits":               f"/orbits/output/{fmt(plan_ahead)}/",
-            "active_fire_priority": f"/active-fire-priority/output/{fmt(today)}/",
+            "active_fire_priority": f"/dshield-demo-configuration/active-fire-priority-proxy/{fmt(today)}/",
             "pre_fire_priority":    f"/pre-fire-priority/output/{fmt(plan_ahead)}/",
         },
         "outputs": {
