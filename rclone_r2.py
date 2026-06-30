@@ -178,7 +178,10 @@ def sync_rw_buckets():
 
 
 def sync_read_all():
-    """Download all buckets (read-only and read-write): remote → local directory.
+    """Download the read-only buckets: remote → local directory.
+
+    Only the buckets in the 'read_only' section are downloaded; read-write
+    buckets are left untouched so local edits there are never overwritten.
 
     Uses 'rclone copy' so remotes are never modified. Local directories are
     created automatically if they do not exist.
@@ -188,14 +191,12 @@ def sync_read_all():
     files that have no counterpart in the remote are left untouched, since
     'rclone copy' never deletes files from the destination.
     """
-    for section in ("read_only", "read_write"):
-        sec = _cfg[section]
-        remote = sec["rclone_remote"]
-        label = "read-only " if section == "read_only" else "read-write"
-        for bucket in sec["buckets"]:
-            local = bucket["local_dir"]
-            remote_path = f"{remote}:{bucket['bucket_name']}"
-            Path(local).mkdir(parents=True, exist_ok=True)
-            print(f"\n[{label}]  {remote_path}  →  {local}")
-            run_rclone("copy", remote_path, local)
+    sec = _cfg["read_only"]
+    remote = sec["rclone_remote"]
+    for bucket in sec["buckets"]:
+        local = bucket["local_dir"]
+        remote_path = f"{remote}:{bucket['bucket_name']}"
+        Path(local).mkdir(parents=True, exist_ok=True)
+        print(f"\n[read-only]  {remote_path}  →  {local}")
+        run_rclone("copy", remote_path, local)
 
