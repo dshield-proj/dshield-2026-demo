@@ -1,0 +1,1893 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Burned-Area Tasking Console — CONUS Fire Watch</title>
+<style>
+:root {
+  --page:      #ece7dc;
+  --surface:   #f7f4ee;
+  --panel:     #fbf9f4;
+  --panel-2:   #f1ece1;
+  --ink:       #1a1712;
+  --ink-2:     #57534a;
+  --muted:     #8a8478;
+  --hair:      #e2ddcf;
+  --hair-2:    #d5cebc;
+  --land:      #e7e0d1;
+  --land-line: #cfc6b2;
+
+  --az:   #2a78d6;
+  --fl:   #008300;
+  --ca:   #b83f74;
+  --az-soft: rgba(42,120,214,0.16);
+  --fl-soft: rgba(0,131,0,0.16);
+  --ca-soft: rgba(184,63,116,0.16);
+  --soil:      #1f7f9c;   /* soil-moisture identity (dry→wet ramp lives server-side) */
+  --soil-weak: rgba(31,127,156,0.14);
+  --rawif:     #17130e;   /* RawIF sweep dots — neutral ink, flips light in dark theme */
+
+  --burn:     #d03b3b;   /* status: classified burned — never a series color */
+  --ember:    #c2410c;
+  --ember-2:  #e8621f;
+  --ember-glow: rgba(194,65,12,0.28);
+
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --r: 10px;
+  --shadow: 0 1px 2px rgba(26,23,18,0.06), 0 6px 24px rgba(26,23,18,0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page:      #100e0a;
+    --surface:   #1a1712;
+    --panel:     #201c15;
+    --panel-2:   #16130e;
+    --ink:       #f4efe6;
+    --ink-2:     #c3bcac;
+    --muted:     #8f8878;
+    --hair:      #322c22;
+    --hair-2:    #40382b;
+    --land:      #292219;
+    --land-line: #3d3427;
+    --az:   #3987e5;
+    --fl:   #35a635;
+    --ca:   #e07aa6;
+    --az-soft: rgba(57,135,229,0.18);
+    --fl-soft: rgba(53,166,53,0.18);
+    --ca-soft: rgba(224,122,166,0.18);
+    --soil:      #54c3dc;
+    --soil-weak: rgba(84,195,220,0.16);
+    --rawif:     #f2ecdf;
+    --burn:     #e05555;
+    --ember:    #ff8a3d;
+    --ember-2:  #ffa766;
+    --ember-glow: rgba(255,138,61,0.30);
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 30px rgba(0,0,0,0.45);
+  }
+}
+:root[data-theme="light"] {
+  --page:#ece7dc; --surface:#f7f4ee; --panel:#fbf9f4; --panel-2:#f1ece1;
+  --ink:#1a1712; --ink-2:#57534a; --muted:#8a8478; --hair:#e2ddcf; --hair-2:#d5cebc;
+  --land:#e7e0d1; --land-line:#cfc6b2;
+  --az:#2a78d6; --fl:#008300; --ca:#b83f74;
+  --az-soft:rgba(42,120,214,0.16); --fl-soft:rgba(0,131,0,0.16); --ca-soft:rgba(184,63,116,0.16);
+  --soil:#1f7f9c; --soil-weak:rgba(31,127,156,0.14);
+  --rawif:#17130e;
+  --burn:#d03b3b; --ember:#c2410c; --ember-2:#e8621f; --ember-glow:rgba(194,65,12,0.28);
+  --shadow:0 1px 2px rgba(26,23,18,0.06), 0 6px 24px rgba(26,23,18,0.06);
+}
+:root[data-theme="dark"] {
+  --page:#100e0a; --surface:#1a1712; --panel:#201c15; --panel-2:#16130e;
+  --ink:#f4efe6; --ink-2:#c3bcac; --muted:#8f8878; --hair:#322c22; --hair-2:#40382b;
+  --land:#292219; --land-line:#3d3427;
+  --az:#3987e5; --fl:#35a635; --ca:#e07aa6;
+  --az-soft:rgba(57,135,229,0.18); --fl-soft:rgba(53,166,53,0.18); --ca-soft:rgba(224,122,166,0.18);
+  --soil:#54c3dc; --soil-weak:rgba(84,195,220,0.16);
+  --rawif:#f2ecdf;
+  --burn:#e05555; --ember:#ff8a3d; --ember-2:#ffa766; --ember-glow:rgba(255,138,61,0.30);
+  --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 30px rgba(0,0,0,0.45);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 78% -10%, var(--ember-glow), transparent 60%),
+    var(--page);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  padding: clamp(14px, 2.4vw, 30px);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1240px; margin: 0 auto; }
+
+/* ---------- command bar ---------- */
+.cmd {
+  display: flex; flex-wrap: wrap; gap: 20px 28px;
+  align-items: flex-end; justify-content: space-between;
+  padding-bottom: 18px; margin-bottom: 20px;
+  border-bottom: 1px solid var(--hair);
+}
+.brand { display: flex; flex-direction: column; gap: 8px; min-width: 260px; }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ember);
+  display: flex; align-items: center; gap: 9px;
+}
+.eyebrow .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ember); box-shadow: 0 0 0 4px var(--ember-glow);
+}
+h1 {
+  font-size: clamp(22px, 3.1vw, 33px); line-height: 1.08; margin: 0;
+  font-weight: 640; letter-spacing: -0.018em; text-wrap: balance; max-width: 20ch;
+}
+.sub { color: var(--ink-2); font-size: 14px; max-width: 56ch; }
+.sub .win { font-family: var(--font-mono); color: var(--ink); font-size: 13px; }
+
+.cmd-right { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+.stats { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.stat {
+  background: var(--panel); border: 1px solid var(--hair);
+  border-radius: var(--r); padding: 11px 15px 12px; min-width: 88px;
+  box-shadow: var(--shadow);
+}
+.stat .v {
+  font-size: 25px; font-weight: 680; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.stat.accent .v { color: var(--ember); }
+.stat.status-burn .v { color: var(--burn); }
+.stat .k {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted); margin-top: 7px;
+}
+.theme-btn {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
+  color: var(--ink-2); background: var(--panel); border: 1px solid var(--hair-2);
+  border-radius: 8px; padding: 5px 10px; cursor: pointer;
+}
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+
+/* ---------- stage ---------- */
+.stage {
+  display: grid; grid-template-columns: minmax(0,1.62fr) minmax(240px,0.9fr);
+  gap: 16px; align-items: stretch;
+}
+.card {
+  background: var(--surface); border: 1px solid var(--hair);
+  border-radius: 14px; box-shadow: var(--shadow);
+}
+.mapcard { padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 12px; position: relative; }
+.map-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.map-head .lbl {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.map-head .now {
+  font-family: var(--font-mono); font-size: 15px; font-weight: 600;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.map-head .now b { color: var(--ember); }
+
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.state { fill: var(--land); stroke: var(--land-line); stroke-width: 0.6; }
+
+.site-base { fill: none; stroke: var(--muted); stroke-width: 1; opacity: 0.42; }
+.marker { cursor: pointer; }
+.marker .halo { fill: var(--ember); opacity: 0; }
+.marker.active .halo { opacity: 0.20; }
+.marker .core { stroke: var(--surface); stroke-width: 1.4; }
+
+.insets { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.inset {
+  background: var(--panel-2); border: 1px solid var(--hair);
+  border-radius: 10px; padding: 9px 10px 8px; min-width: 0;
+}
+.inset h4 {
+  margin: 0 0 6px; font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.inset h4 .cnt { color: var(--ember); font-weight: 600; }
+.ibox { stroke-width: 1.4; }
+.ibox-base { fill: none; stroke: var(--muted); stroke-width: 1; opacity: 0.35; stroke-dasharray: 3 3; }
+.ilabel { font-family: var(--font-mono); font-size: 9.5px; fill: var(--ink-2); }
+.iempty { font-family: var(--font-mono); font-size: 10px; fill: var(--muted); text-anchor: middle; }
+.det-dot { pointer-events: none; }
+
+.dot-legend {
+  display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center;
+  margin: 0 2px; font-size: 11.5px; color: var(--ink-2);
+}
+.dot-legend .item { display: inline-flex; align-items: center; gap: 6px; }
+.dot-legend .d-burn { width: 9px; height: 9px; border-radius: 50%; background: var(--burn); }
+.dot-legend .d-clear { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); }
+.map-note { margin: 2px 2px 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
+/* ---------- danger raster layer ---------- */
+.danger-img { opacity: 0.66; pointer-events: none; }
+@media (prefers-color-scheme: dark) { .danger-img { opacity: 0.78; } }
+:root[data-theme="light"] .danger-img { opacity: 0.66; }
+:root[data-theme="dark"] .danger-img { opacity: 0.78; }
+.state-line { fill: none; stroke: var(--land-line); stroke-width: 0.6; }
+.mh-r { display: flex; gap: 12px; align-items: baseline; }
+.layer-btn[aria-pressed="true"] { color: var(--ember); border-color: var(--ember); }
+
+/* ---------- RawIF sweep layer ---------- */
+/* canvas pinned over the CONUS svg (same box, same aspect); hits pass through */
+.conus-wrap { position: relative; }
+.conus-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.rawif-hud {
+  position: absolute; left: 10px; bottom: 8px; pointer-events: none;
+  font-family: var(--font-mono); font-size: 11px; color: var(--ink-2);
+  background: var(--panel); border: 1px solid var(--hair); border-radius: 999px;
+  padding: 2px 9px; box-shadow: var(--shadow);
+}
+.rawif-hud b { color: var(--ink); font-weight: 600; }
+.rawif-hud button {
+  pointer-events: auto; cursor: pointer;
+  background: none; border: 0; padding: 0; margin: 0 6px 0 0;
+  color: var(--ink-2); display: inline-flex; vertical-align: -1px;
+}
+.rawif-hud button:hover { color: var(--ember); }
+.rawif-hud button:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: 3px; }
+.rawif-hud button svg { width: 10px; height: 10px; fill: currentColor; }
+.rawif-hud .spd { margin: 0 0 0 7px; font-family: var(--font-mono); font-size: 10.5px; }
+.rawif-hud input[type="range"] {
+  pointer-events: auto; -webkit-appearance: none; appearance: none;
+  width: 84px; height: 3px; margin: 0 8px 0 2px; vertical-align: 2px;
+  background: var(--hair-2); border-radius: 2px; outline: none; cursor: pointer;
+}
+.rawif-hud input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--ember); border: none; cursor: grab;
+}
+.rawif-hud input[type="range"]::-moz-range-thumb {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--ember); border: none;
+}
+.rawif-hud input[type="range"]:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.dot-legend .d-rawif { width: 8px; height: 8px; border-radius: 50%; background: var(--rawif); }
+.danger-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  margin: 0 2px; font-size: 11.5px; color: var(--ink-2);
+}
+.danger-legend .ramp {
+  display: flex; width: 150px; height: 9px; border-radius: 3px;
+  overflow: hidden; border: 1px solid var(--hair-2);
+}
+.danger-legend .ramp i { display: block; }
+.danger-legend .dl-note { color: var(--muted); }
+.dsq { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 3px; }
+
+/* ---------- rail ---------- */
+.rail { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panelcard { padding: 14px 15px 15px; }
+.panelcard h3 {
+  margin: 0 0 12px; font-size: 12px; font-family: var(--font-mono);
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.panelcard h3 .rt { color: var(--ink-2); }
+.legend { display: flex; flex-direction: column; gap: 9px; }
+.leg-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.leg-row .sw { width: 13px; height: 13px; border-radius: 4px; flex: none; }
+.leg-row .nm { font-weight: 550; }
+.leg-row .ct { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.leg-note {
+  display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink-2);
+  margin-top: 4px; padding-top: 11px; border-top: 1px dashed var(--hair-2);
+}
+.leg-note .ring {
+  width: 13px; height: 13px; border-radius: 50%; flex: none;
+  border: 2px solid var(--ember); box-shadow: 0 0 0 3px var(--ember-glow);
+}
+
+.roster { display: flex; flex-direction: column; gap: 7px; }
+.fire {
+  display: grid; grid-template-columns: 8px 1fr auto; gap: 10px; align-items: center;
+  padding: 9px 11px; border-radius: 9px; background: var(--panel-2);
+  border: 1px solid transparent; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.fire:hover { border-color: var(--hair-2); }
+.fire:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
+.fire .stripe { width: 4px; height: 100%; min-height: 30px; border-radius: 3px; align-self: stretch; }
+.fire .body { min-width: 0; }
+.fire .nm { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fire .co { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.fire .obs { font-family: var(--font-mono); font-size: 10.5px; margin-top: 2px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.fire .obs b { color: var(--burn); font-weight: 640; }
+.fire .rt { text-align: right; }
+.fire .days { font-family: var(--font-mono); font-weight: 640; font-size: 14px; font-variant-numeric: tabular-nums; }
+.fire .dl { font-family: var(--font-mono); font-size: 9.5px; color: var(--muted); letter-spacing: 0.04em; }
+.tag-new {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ember); border: 1px solid var(--ember);
+  border-radius: 4px; padding: 1px 4px; margin-left: 6px; vertical-align: middle;
+}
+
+/* ---------- transport ---------- */
+.transport {
+  margin: 16px 0; background: var(--surface); border: 1px solid var(--hair);
+  border-radius: 14px; box-shadow: var(--shadow);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;
+}
+.tp-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.btn {
+  font-family: var(--font-ui); font-size: 13px; font-weight: 550;
+  color: var(--ink); background: var(--panel); border: 1px solid var(--hair-2);
+  border-radius: 9px; padding: 8px 12px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px; line-height: 1;
+  transition: background .14s, border-color .14s, transform .05s;
+}
+.btn:hover { border-color: var(--muted); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.btn.play { background: var(--ember); color: #fff; border-color: var(--ember); min-width: 104px; justify-content: center; }
+.btn.icon { padding: 8px 10px; }
+.btn svg.gl { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+.btn.play svg.gl { fill: #fff; stroke: none; }
+
+.speeds { display: inline-flex; border: 1px solid var(--hair-2); border-radius: 9px; overflow: hidden; margin-left: auto; }
+.speeds button {
+  font-family: var(--font-mono); font-size: 11.5px; padding: 8px 11px; border: none;
+  background: var(--panel); color: var(--ink-2); cursor: pointer; border-left: 1px solid var(--hair);
+}
+.speeds button:first-child { border-left: none; }
+.speeds button[aria-pressed="true"] { background: var(--ember); color: #fff; }
+.speeds button:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
+
+.dayreadout { font-family: var(--font-mono); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 10px; }
+.dayreadout .big { font-size: 21px; font-weight: 640; letter-spacing: 0.01em; }
+.dayreadout .idx { color: var(--muted); font-size: 12px; }
+
+.scrub-hold { position: relative; padding-top: 2px; }
+.ticks { position: relative; height: 34px; margin: 0 2px 2px; display: flex; justify-content: space-between; align-items: stretch; }
+.tick {
+  flex: 1; position: relative; cursor: pointer; background: none; border: none; padding: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 0;
+}
+.tick .bar { width: 4px; height: 12px; border-radius: 2px; background: var(--hair-2); transition: height .16s, background .16s; }
+.tick[data-cur="1"] .bar { height: 26px; background: var(--ember); }
+.tick:hover .bar { background: var(--muted); }
+.tick .tlab { font-family: var(--font-mono); font-size: 9px; color: var(--muted); margin-top: 4px; opacity: 0; transition: opacity .16s; white-space: nowrap; }
+.tick[data-show="1"] .tlab { opacity: 1; }
+.tick[data-cur="1"] .tlab { opacity: 1; color: var(--ember); }
+.tick:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: 4px; }
+input[type="range"].scrub {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+  background: var(--hair); border-radius: 4px; outline: none; margin: 2px 0 0; cursor: pointer;
+}
+input[type="range"].scrub::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--ember); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--ember), var(--shadow); cursor: grab;
+}
+input[type="range"].scrub::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%; background: var(--ember);
+  border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--ember); cursor: grab;
+}
+input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow); }
+
+/* ---------- trend + gantt ---------- */
+.trendcard, .ganttcard { padding: 15px 16px 16px; margin-bottom: 16px; }
+.chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+.chart-head h3 { margin: 0; font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.chart-head .cap { font-size: 12.5px; color: var(--ink-2); max-width: 62ch; }
+.chart-scroll { overflow-x: auto; }
+#trend { min-width: 620px; }
+#gantt { min-width: 620px; }
+.grid-h { stroke: var(--hair); stroke-width: 0.6; }
+.ax-lab { font-family: var(--font-mono); font-size: 9.5px; fill: var(--muted); }
+.trend-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; transition: opacity .15s, stroke-width .15s; }
+.trend-pt { transition: opacity .15s; }
+.trend-lab { font-size: 11px; font-weight: 550; fill: var(--ink-2); transition: opacity .15s; }
+.trend-dim .trend-line, .trend-dim .trend-pt, .trend-dim .trend-lab { opacity: 0.18; }
+.trend-hot .trend-line { stroke-width: 3; }
+.trend-hot .trend-lab { fill: var(--ink); }
+.gcol-lab { font-family: var(--font-mono); font-size: 9.5px; fill: var(--muted); text-anchor: middle; }
+.gcol-lab.cur { fill: var(--ember); font-weight: 700; }
+.grow-label { font-size: 12px; fill: var(--ink); font-weight: 550; cursor: pointer; }
+.grow-label.dim { fill: var(--ink-2); font-weight: 500; }
+.grow-region { font-family: var(--font-mono); font-size: 9.5px; fill: var(--muted); }
+.gbar { rx: 4; ry: 4; }
+.gcell-cur { fill: none; stroke: var(--ember); stroke-width: 2; rx: 4; ry: 4; }
+.gplayhead { stroke: var(--ember); stroke-width: 1.5; stroke-dasharray: 2 3; opacity: 0.8; }
+.gband { fill: var(--ember); opacity: 0.06; }
+.gdays { font-family: var(--font-mono); font-size: 11px; fill: var(--ink-2); font-variant-numeric: tabular-nums; text-anchor: start; font-weight: 600; }
+.growline { stroke: var(--hair); stroke-width: 0.6; }
+
+/* ---------- soil moisture ---------- */
+.soilcard { padding: 15px 16px 16px; margin-bottom: 16px; }
+.soil-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  margin: 2px 2px 13px; font-size: 11.5px; color: var(--ink-2);
+}
+.soil-legend .ramp {
+  display: flex; width: 150px; height: 9px; border-radius: 3px;
+  overflow: hidden; border: 1px solid var(--hair-2);
+}
+.soil-legend .ramp i { display: block; flex: 1; }
+.soil-legend .sl-note { color: var(--muted); }
+.soil-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.soil-site {
+  background: var(--panel-2); border: 1px solid var(--hair);
+  border-radius: 10px; padding: 11px 12px 12px; min-width: 0;
+}
+.ss-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+.ss-nm { font-weight: 600; font-size: 14px; }
+.ss-co { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.ss-val { text-align: right; white-space: nowrap; line-height: 1; }
+.ss-v { font-size: 22px; font-weight: 680; letter-spacing: -0.02em; color: var(--soil); font-variant-numeric: tabular-nums; }
+.ss-u { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-left: 4px; }
+.ss-map { background: var(--panel); border: 1px solid var(--hair); border-radius: 8px; overflow: hidden; }
+.ss-map svg { display: block; width: 100%; height: auto; }
+.soil-img { pointer-events: none; }
+.ss-box { fill: none; stroke: var(--soil); stroke-width: 1.4; stroke-dasharray: 3 3; }
+.ss-none { font-family: var(--font-mono); font-size: 10px; fill: var(--muted); text-anchor: middle; }
+.ss-spark { display: block; width: 100%; height: auto; margin-top: 9px; }
+.ssp-line { fill: none; stroke: var(--soil); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ssp-pt { fill: var(--soil); }
+.ssp-grid { stroke: var(--hair); stroke-width: 0.6; }
+.ssp-lab { font-family: var(--font-mono); font-size: 8.5px; fill: var(--muted); }
+.ssp-playhead { stroke: var(--ember); stroke-width: 1.5; stroke-dasharray: 2 3; opacity: 0.85; }
+.ssp-cur { fill: var(--ember); }
+.soil-site-mark { fill: none; stroke: var(--soil); stroke-width: 1.3; stroke-dasharray: 3 2; opacity: 0.9; }
+.soil-site-lab { font-family: var(--font-mono); font-size: 9px; fill: var(--soil); letter-spacing: 0.04em; }
+@media (max-width: 640px) { .soil-grid { grid-template-columns: 1fr; } }
+
+/* ---------- detail overlay ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 90; display: none;
+  align-items: center; justify-content: center; padding: 20px;
+  background: rgba(16,14,10,0.55); backdrop-filter: blur(2px);
+}
+.overlay.open { display: flex; }
+.detail {
+  background: var(--surface); border: 1px solid var(--hair-2); border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.4); width: min(760px, 96vw);
+  max-height: 92vh; overflow-y: auto; padding: 18px 20px 20px;
+}
+.detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 8px; }
+.detail-head .ttl { display: flex; align-items: center; gap: 10px; }
+.detail-head .sw { width: 14px; height: 14px; border-radius: 4px; }
+.detail-head h2 { margin: 0; font-size: 21px; font-weight: 660; letter-spacing: -0.01em; }
+.detail-meta { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin: 2px 0 10px; line-height: 1.7; word-break: break-all; }
+.close-btn {
+  background: var(--panel); border: 1px solid var(--hair-2); border-radius: 8px;
+  width: 32px; height: 32px; cursor: pointer; color: var(--ink-2); font-size: 16px; line-height: 1;
+}
+.close-btn:hover { border-color: var(--muted); }
+.close-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.detail-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.modes { display: inline-flex; border: 1px solid var(--hair-2); border-radius: 9px; overflow: hidden; }
+.modes button {
+  font-family: var(--font-ui); font-size: 12.5px; font-weight: 550; padding: 7px 13px;
+  border: none; background: var(--panel); color: var(--ink-2); cursor: pointer; border-left: 1px solid var(--hair);
+}
+.modes button:first-child { border-left: none; }
+.modes button[aria-pressed="true"] { background: var(--ember); color: #fff; }
+.detail-stat { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-left: auto; }
+.detail-stat b { color: var(--burn); }
+.detail-map-hold { background: var(--panel-2); border: 1px solid var(--hair); border-radius: 10px; padding: 8px; }
+.detail-strip { margin-top: 12px; }
+.detail-strip h5 { margin: 0 0 6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.strip-cells { display: flex; gap: 4px; }
+.strip-cell {
+  flex: 1; border: none; border-radius: 5px; background: var(--panel-2); cursor: pointer;
+  padding: 0; position: relative; height: 42px; overflow: hidden; min-width: 14px;
+}
+.strip-cell .fillbar { position: absolute; bottom: 0; left: 0; right: 0; background: var(--burn); opacity: 0.75; }
+.strip-cell.off { opacity: 0.28; cursor: default; }
+.strip-cell[data-cur="1"] { outline: 2px solid var(--ember); outline-offset: 1px; }
+.strip-cell:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
+.strip-labs { display: flex; gap: 4px; margin-top: 3px; }
+.strip-labs span { flex: 1; text-align: center; font-family: var(--font-mono); font-size: 8.5px; color: var(--muted); min-width: 14px; }
+.detail-loading { font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding: 30px; text-align: center; }
+
+/* ---------- tooltip / footer / conn ---------- */
+.tooltip {
+  position: fixed; pointer-events: none; z-index: 120; opacity: 0;
+  transform: translate(-50%, -112%); transition: opacity .1s;
+  background: var(--ink); color: var(--surface); border-radius: 8px;
+  padding: 8px 11px; font-size: 12px; box-shadow: 0 8px 26px rgba(0,0,0,0.28); max-width: 250px;
+}
+.tooltip .tt-nm { font-weight: 680; font-size: 13px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+.tooltip .tt-sw { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.tooltip .tt-row { font-family: var(--font-mono); font-size: 10.5px; opacity: 0.82; }
+
+.foot {
+  margin-top: 2px; padding-top: 14px; border-top: 1px solid var(--hair);
+  font-size: 11.5px; color: var(--muted); font-family: var(--font-mono);
+  display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: space-between; align-items: center;
+}
+.live { display: inline-flex; align-items: center; gap: 7px; }
+.live .ld { width: 7px; height: 7px; border-radius: 50%; background: var(--fl); }
+.live.err .ld { background: var(--burn); }
+.live.err { color: var(--burn); }
+
+.boot { padding: 60px 20px; text-align: center; font-family: var(--font-mono); color: var(--muted); }
+.boot.err { color: var(--burn); }
+
+@media (max-width: 860px) { .stage { grid-template-columns: 1fr; } .cmd-right { align-items: flex-start; } }
+@media (max-width: 560px) { .insets { grid-template-columns: 1fr; } .speeds { margin-left: 0; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .marker.active .halo { animation: pulse 1.9s ease-in-out infinite; }
+  @keyframes pulse {
+    0%,100% { opacity: 0.10; transform: scale(1); }
+    50%     { opacity: 0.30; transform: scale(1.55); }
+  }
+  .marker .halo { transform-box: fill-box; transform-origin: center; }
+  .live .ld { animation: blink 2.4s ease-in-out infinite; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="boot" id="boot">connecting to data server…</div>
+</div>
+<div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="Fire detection detail">
+  <div class="detail" id="detail"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const NS = "http://www.w3.org/2000/svg";
+  const qsToken = new URLSearchParams(location.search).get("token") || "";
+  const rawUrl = (path, params) => {
+    const u = new URL(path, location.origin);
+    if (params) for (const k in params) u.searchParams.set(k, params[k]);
+    if (qsToken) u.searchParams.set("token", qsToken);
+    return u.toString();
+  };
+  const api = (path, params) => fetch(rawUrl(path, params))
+    .then((r) => { if (!r.ok) throw new Error(path + " -> " + r.status); return r.json(); });
+  const el = (t, a) => { const e = document.createElementNS(NS, t); if (a) for (const k in a) e.setAttribute(k, a[k]); return e; };
+  const cssv = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const REG = {
+    AZ: { name: "Southwest",  varc: "--az", soft: "--az-soft" },
+    FL: { name: "Southeast",  varc: "--fl", soft: "--fl-soft" },
+    CA: { name: "West Coast", varc: "--ca", soft: "--ca-soft" },
+  };
+  const regColor = (r) => cssv(REG[r].varc);
+  const inBox = (o, bb) => o.clon >= bb[0] && o.clon <= bb[1] && o.clat >= bb[2] && o.clat <= bb[3];
+  const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const parts = (iso) => { const [y, m, d] = iso.split("-").map(Number); return { y, m, d }; };
+  const fmt = (iso) => { const p = parts(iso); return MON[p.m - 1] + " " + p.d + ", " + p.y; };
+  const fmtShort = (iso) => { const p = parts(iso); return MON[p.m - 1] + " " + p.d; };
+  const fmtDay = (iso) => String(parts(iso).d);
+  const dotOpacity = (u) => (u == null ? 0.7 : 0.4 + 0.55 * Math.max(0, Math.min(1, 1 - u)));
+  /* soil thumbnail display bbox — must match soil_warm_bbox() in server.py */
+  const soilBbox = (a) => {
+    const pl = +((a.lon_u - a.lon_l) * 0.08).toFixed(3);
+    const pt = +((a.lat_u - a.lat_l) * 0.08).toFixed(3);
+    return [+(a.lon_l - pl).toFixed(3), +(a.lon_u + pl).toFixed(3),
+            +(a.lat_l - pt).toFixed(3), +(a.lat_u + pt).toFixed(3)];
+  };
+
+  /* ---------- theme toggle ---------- */
+  const savedTheme = localStorage.getItem("fire-theme");
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+
+  /* ---------- projections ---------- */
+  function albersFactory() {
+    const d2r = Math.PI / 180, lat0 = 23 * d2r, lat1 = 29.5 * d2r, lat2 = 45.5 * d2r;
+    const n = (Math.sin(lat1) + Math.sin(lat2)) / 2;
+    const C = Math.cos(lat1) ** 2 + 2 * n * Math.sin(lat1);
+    const rho0 = Math.sqrt(C - 2 * n * Math.sin(lat0)) / n;
+    return (lon, lat) => {
+      const rho = Math.sqrt(Math.max(0, C - 2 * n * Math.sin(lat * d2r))) / n;
+      const th = n * (lon - -96) * d2r;
+      return [rho * Math.sin(th), rho0 - rho * Math.cos(th)];
+    };
+  }
+  const albers = albersFactory();
+  function eachCoord(geom, fn) {
+    const polys = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
+    polys.forEach((poly) => poly.forEach((ring) => ring.forEach(fn)));
+  }
+  function fitTransform(features, W, H, pad) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    features.forEach((f) => eachCoord(f.geometry, (c) => {
+      const [x, y] = albers(c[0], c[1]);
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }));
+    const s = Math.min((W - 2 * pad) / (maxX - minX), (H - 2 * pad) / (maxY - minY));
+    const ox = (W - s * (maxX - minX)) / 2, oy = (H - s * (maxY - minY)) / 2;
+    const proj = (lon, lat) => { const [x, y] = albers(lon, lat); return proj.fromAlbers(x, y); };
+    proj.fromAlbers = (x, y) => [ox + (x - minX) * s, oy + (maxY - y) * s];
+    return proj;
+  }
+  function localProj(bbox, W, H, pad) {
+    const [lonMin, lonMax, latMin, latMax] = bbox;
+    const latC = (latMin + latMax) / 2, kx = Math.cos(latC * Math.PI / 180);
+    const w = (lonMax - lonMin) * kx, h = (latMax - latMin);
+    const s = Math.min((W - 2 * pad) / w, (H - 2 * pad) / h);
+    const ox = (W - s * w) / 2, oy = (H - s * h) / 2;
+    return (lon, lat) => [ox + (lon - lonMin) * kx * s, oy + (latMax - lat) * s];
+  }
+  function pathFor(geom, proj) {
+    const polys = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
+    let d = "";
+    polys.forEach((poly) => poly.forEach((ring) => {
+      ring.forEach((c, i) => { const [x, y] = proj(c[0], c[1]); d += (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1); });
+      d += "Z";
+    }));
+    return d;
+  }
+
+  /* ---------- tooltip ---------- */
+  const tip = document.getElementById("tooltip");
+  const showTip = (html, x, y) => { tip.innerHTML = html; tip.style.left = x + "px"; tip.style.top = y + "px"; tip.style.opacity = "1"; };
+  const hideTip = () => { tip.style.opacity = "0"; };
+
+  /* ---------- app state ---------- */
+  let CONUS = null, B = null;         // geometry, bundle
+  let cur = 0, playing = false, timer = null, stepMs = 850;
+  let renderSeq = 0;                  // guards async dot draws against stale days
+  const detCache = new Map();         // "day|fire" -> Promise<payload|null>
+  let ui = {};                        // rebuilt DOM/svg refs
+
+  const getDet = (day, fire) => {
+    const key = day + "|" + fire;
+    if (!detCache.has(key)) {
+      detCache.set(key, api("/api/detections", { day, fire }).catch(() => null));
+    }
+    return detCache.get(key);
+  };
+
+  const dangerColor = (v) => {
+    if (v == null || !B.danger) return null;
+    const b = B.danger.legend.find((x) => v >= x[0] && v <= x[1]);
+    return b ? `rgb(${b[2][0]},${b[2][1]},${b[2][2]})` : null;
+  };
+
+  function fireTip(f, dayIdx) {
+    const s = f.series[dayIdx];
+    const dv = f.danger ? f.danger[dayIdx] : null;
+    return `<div class="tt-nm"><span class="tt-sw" style="background:${regColor(f.region)}"></span>${esc(f.name.replace(/_/g, " "))}</div>`
+      + `<div class="tt-row"><b>${REG[f.region].name}</b> · ${f.days_count} day${f.days_count > 1 ? "s" : ""} tasked</div>`
+      + (s ? `<div class="tt-row">${fmtShort(B.dates[dayIdx])}: ${s[0]} obs · ${s[1]} burned (${Math.round(100 * s[1] / s[0])}%)</div>` : `<div class="tt-row">no detections this day</div>`)
+      + (dv != null ? `<div class="tt-row"><span class="dsq" style="background:${dangerColor(dv)}"></span>WFPI Day-1 danger ${dv}</div>` : "")
+      + `<div class="tt-row">fire start ${f.fire_start}</div>`
+      + `<div class="tt-row">click for detection detail</div>`;
+  }
+
+  /* ================= build ================= */
+  function buildAll() {
+    const N = B.dates.length;
+    const app = document.getElementById("app");
+    app.innerHTML = `
+      <header class="cmd">
+        <div class="brand">
+          <div class="eyebrow"><span class="dot"></span> DShield · Burned-Area Tasking</div>
+          <h1>CONUS active-fire watch &amp; burned-area detections</h1>
+          <div class="sub">Five fires are prioritized daily for satellite tasking; dots are CYGNSS specular-point
+            classifications inside each footprint. Window <span class="win">${fmt(B.dates[0])} → ${fmt(B.dates[N - 1])}</span>.
+            Data is read live from the local drive.${B.danger ? " Shaded backdrop: USGS WFPI Day-1 fire-danger forecast." : ""}${B.rawif ? " Black dots: commanded RawIF captures sweeping the day's actual specular tracks." : ""}</div>
+        </div>
+        <div class="cmd-right">
+          <button class="theme-btn" id="themebtn" type="button">theme: auto</button>
+          <div class="stats" id="stats"></div>
+        </div>
+      </header>
+      <div class="stage">
+        <section class="card mapcard">
+          <div class="map-head">
+            <span class="lbl">Contiguous U.S. — tasking footprints</span>
+            <span class="mh-r">
+              ${B.rawif ? '<button class="theme-btn layer-btn" id="rawifbtn" type="button">rawif sweep</button>' : ""}
+              ${B.danger ? '<button class="theme-btn layer-btn" id="dangerbtn" type="button">danger layer</button>' : ""}
+              <span class="now">DAY <b id="nowidx"></b> · <span id="nowdate"></span></span>
+            </span>
+          </div>
+          <div class="conus-wrap">
+            <svg id="conus" viewBox="0 0 960 590" role="img" aria-label="Map of the contiguous United States with the day's prioritized fire tasking areas marked."></svg>
+            ${B.rawif ? `<canvas id="rawif-canvas" aria-hidden="true"></canvas>
+            <div class="rawif-hud" id="rawif-hud" style="display:none" role="status" aria-live="off"><span id="rawif-ctl" style="display:none"><button id="rawif-prevp" type="button" title="previous pass" aria-label="Previous pass"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="3" height="16" rx="1"/><polygon points="20,4 8,12 20,20"/></svg></button><button id="rawif-back" type="button" title="back 15 min" aria-label="Rewind 15 minutes"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="11,4 1,12 11,20"/><polygon points="22,4 12,12 22,20"/></svg></button><button id="rawif-pause" type="button" aria-label="Pause sweep"></button><button id="rawif-fwd" type="button" title="forward 15 min" aria-label="Fast-forward 15 minutes"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="2,4 12,12 2,20"/><polygon points="13,4 23,12 13,20"/></svg></button><button id="rawif-nextp" type="button" title="next pass" aria-label="Next pass"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="4,4 16,12 4,20"/><rect x="17" y="4" width="3" height="16" rx="1"/></svg></button><input type="range" id="rawif-scrub" min="0" max="1000" step="1" value="0" aria-label="Sweep position within the day's passes"></span>RawIF <b id="rawif-time">--:--</b>Z · <span id="rawif-pass"></span><button class="spd" id="rawif-speed" type="button" style="display:none" title="playback speed" aria-label="Cycle playback speed">1×</button></div>` : ""}
+          </div>
+          <div class="insets">
+            <div class="inset">
+              <h4>Arizona / New Mexico <span class="cnt" id="az-cnt"></span></h4>
+              <svg id="inset-az" viewBox="0 0 300 220" role="img" aria-label="Zoomed view of the Arizona and New Mexico fire tasking boxes with detection points."></svg>
+            </div>
+            <div class="inset">
+              <h4>Florida <span class="cnt" id="fl-cnt"></span></h4>
+              <svg id="inset-fl" viewBox="0 0 300 220" role="img" aria-label="Zoomed view of the Florida fire tasking boxes with detection points."></svg>
+            </div>
+          </div>
+          <div class="dot-legend">
+            <span class="item"><span class="d-burn"></span> classified burned</span>
+            <span class="item"><span class="d-clear"></span> unburned</span>
+            <span class="item">dot opacity ∝ classifier confidence</span>
+            ${B.rawif ? '<span class="item"><span class="d-rawif"></span> RawIF capture track (sweeps time of day, idle gaps skipped; each satellite’s leading dot is tagged with its CYGNSS NORAD id)</span>' : ""}
+          </div>
+          ${B.danger ? `<div class="danger-legend">
+            <span><b>WFPI Day-1</b> fire danger</span>
+            <span class="ramp" id="dramp"></span>
+            <span>0 low → 150 extreme</span>
+            <span class="dl-note" id="dnote"></span>
+          </div>` : ""}
+          <p class="map-note" id="map-note"></p>
+        </section>
+        <aside class="rail">
+          <section class="card panelcard">
+            <h3>Regions <span class="rt">unique fires</span></h3>
+            <div class="legend" id="legend"></div>
+            <div class="leg-note"><span class="ring"></span> Ember ring &amp; pulse = active on the selected day</div>
+          </section>
+          <section class="card panelcard">
+            <h3>Roster <span class="rt" id="roster-date"></span></h3>
+            <div class="roster" id="roster"></div>
+          </section>
+        </aside>
+      </div>
+      <section class="transport">
+        <div class="tp-top">
+          <button class="btn play" id="play" aria-label="Play timeline">
+            <svg class="gl" viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg><span id="playlbl">Play</span>
+          </button>
+          <button class="btn icon" id="prev" aria-label="Previous day" title="Previous day (←)"><svg class="gl" viewBox="0 0 24 24"><polyline points="15,5 8,12 15,19"/></svg></button>
+          <button class="btn icon" id="next" aria-label="Next day" title="Next day (→)"><svg class="gl" viewBox="0 0 24 24"><polyline points="9,5 16,12 9,19"/></svg></button>
+          <div class="dayreadout"><span class="big" id="ro-date"></span><span class="idx" id="ro-idx"></span></div>
+          <div class="speeds" role="group" aria-label="Playback speed">
+            <button data-ms="1400">0.7×</button><button data-ms="850" aria-pressed="true">1×</button><button data-ms="450">2×</button>
+          </div>
+        </div>
+        <div class="scrub-hold">
+          <div class="ticks" id="ticks" role="presentation"></div>
+          <input type="range" class="scrub" id="scrub" min="0" max="${N - 1}" step="1" value="0" aria-label="Day selector" />
+        </div>
+      </section>
+      <section class="card trendcard">
+        <div class="chart-head">
+          <h3>Burn fraction by fire</h3>
+          <span class="cap">Share of each day's specular points classified burned, per fire. Hover a line to isolate it; the ember rule tracks the selected day.</span>
+        </div>
+        <div class="chart-scroll"><svg id="trend"></svg></div>
+      </section>
+      ${B.soil ? `<section class="card soilcard">
+        <div class="chart-head">
+          <h3>Soil moisture <span class="rt">fixed retrieval sites</span></h3>
+          <span class="cap">Retrieved soil moisture at two fixed monitoring areas across the campaign. The
+            field follows the selected day; each sparkline is that site's daily area-mean over the window.</span>
+        </div>
+        <div class="soil-legend">
+          <span><b>${B.soil.units || "index"}</b></span>
+          <span>dry</span><span class="ramp" id="sramp"></span><span>wet</span>
+          <span class="sl-note" id="snote"></span>
+        </div>
+        <div class="soil-grid" id="soil-grid"></div>
+      </section>` : ""}
+      <section class="card ganttcard">
+        <div class="chart-head">
+          <h3>Persistence &amp; rotation</h3>
+          <span class="cap">Every fire's run on the five-slot watchlist. Click a row label for its detection detail.</span>
+        </div>
+        <div class="chart-scroll"><svg id="gantt"></svg></div>
+      </section>
+      <div class="foot">
+        <span class="live" id="live"><span class="ld"></span><span id="live-txt">live</span></span>
+        <span id="foot-src"></span>
+        <span>boxes ≈ 0.5° × 0.6° · dots = CYGNSS specular points · dates are UTC production days${B.danger ? " · danger backdrop = WFPI Day-1 @ 1 km (USGS palette)" : ""}${B.rawif ? " · RawIF sweep = planned captures × actual specular tracks" : ""}</span>
+      </div>`;
+
+    ui = {};
+    ui.N = N;
+
+    /* theme button */
+    const tbtn = document.getElementById("themebtn");
+    const themeLbl = () => "theme: " + (document.documentElement.dataset.theme || "auto");
+    tbtn.textContent = themeLbl();
+    tbtn.onclick = () => {
+      const seq = { "": "light", "light": "dark", "dark": "" };
+      const nxt = seq[document.documentElement.dataset.theme || ""];
+      if (nxt) { document.documentElement.dataset.theme = nxt; localStorage.setItem("fire-theme", nxt); }
+      else { delete document.documentElement.dataset.theme; localStorage.removeItem("fire-theme"); }
+      tbtn.textContent = themeLbl();
+      buildAll(); setDay(cur);
+    };
+
+    /* stats */
+    let totObs = 0, totBurn = 0;
+    B.fires.forEach((f) => f.series.forEach((s) => { if (s) { totObs += s[0]; totBurn += s[1]; } }));
+    const statDefs = [
+      { v: N, k: "days observed" },
+      { v: B.meta.slots_per_day, k: "slots / day", cls: "accent" },
+      { v: B.meta.n_unique, k: "unique fires" },
+      { v: totObs.toLocaleString(), k: "detections" },
+      { v: totObs ? Math.round(100 * totBurn / totObs) + "%" : "—", k: "classified burned", cls: "status-burn" },
+    ];
+    const statsEl = document.getElementById("stats");
+    statDefs.forEach((s) => {
+      const d = document.createElement("div"); d.className = "stat" + (s.cls ? " " + s.cls : "");
+      d.innerHTML = `<div class="v">${s.v}</div><div class="k">${s.k}</div>`;
+      statsEl.appendChild(d);
+    });
+    document.getElementById("foot-src").textContent =
+      `${N} daily configs · ${B.meta.n_unique} incidents (IRWIN) · ${totObs.toLocaleString()} detections on disk`;
+
+    /* CONUS */
+    const conusSvg = document.getElementById("conus");
+    ui.projC = fitTransform(CONUS.features, 960, 590, 22);
+    const dConus = CONUS.features.map((f) => pathFor(f.geometry, ui.projC));
+    const gStates = el("g");
+    dConus.forEach((d) => gStates.appendChild(el("path", { d, class: "state" })));
+    conusSvg.appendChild(gStates);
+    /* danger raster between land fill and everything else; borders redrawn on top */
+    ui.imgDanger = null;
+    if (B.danger && B.danger.rect) {
+      const defs = el("defs"), cp = el("clipPath", { id: "mapclip" });
+      cp.appendChild(el("rect", { x: 0, y: 0, width: 960, height: 590 }));
+      defs.appendChild(cp);
+      conusSvg.appendChild(defs);
+      const Rc = B.danger.rect;
+      const [ix1, iy1] = ui.projC.fromAlbers(Rc[0], Rc[3]);
+      const [ix2, iy2] = ui.projC.fromAlbers(Rc[2], Rc[1]);
+      ui.imgDanger = el("image", {
+        x: ix1.toFixed(1), y: iy1.toFixed(1),
+        width: (ix2 - ix1).toFixed(1), height: (iy2 - iy1).toFixed(1),
+        preserveAspectRatio: "none", class: "danger-img",
+        "clip-path": "url(#mapclip)", style: "display:none",
+      });
+      conusSvg.appendChild(ui.imgDanger);
+      const gLines = el("g");
+      dConus.forEach((d) => gLines.appendChild(el("path", { d, class: "state-line" })));
+      conusSvg.appendChild(gLines);
+    }
+    const gBase = el("g");
+    B.fires.forEach((f) => {
+      const [x, y] = ui.projC(f.clon, f.clat);
+      gBase.appendChild(el("circle", { cx: x, cy: y, r: 3.2, class: "site-base" }));
+    });
+    conusSvg.appendChild(gBase);
+    /* soil-moisture monitoring sites — static dashed markers */
+    if (B.soil && B.soil.areas) {
+      const gSoil = el("g");
+      B.soil.areas.forEach((a) => {
+        const [mx1, my1] = ui.projC(a.lon_l, a.lat_u), [mx2, my2] = ui.projC(a.lon_u, a.lat_l);
+        const bx = Math.min(mx1, mx2), by = Math.min(my1, my2);
+        const bw = Math.max(5, Math.abs(mx2 - mx1)), bh = Math.max(5, Math.abs(my2 - my1));
+        const g = el("g");
+        g.appendChild(el("rect", { x: bx, y: by, width: bw, height: bh, class: "soil-site-mark" }));
+        const lab = el("text", { x: bx + bw + 3, y: by + bh / 2 + 3, class: "soil-site-lab" });
+        lab.textContent = "SM";
+        g.appendChild(lab);
+        g.addEventListener("mousemove", (e) => showTip(
+          `<div class="tt-nm"><span class="tt-sw" style="background:${cssv("--soil")}"></span>${esc(a.label)}</div>`
+          + `<div class="tt-row">soil-moisture retrieval site</div>`
+          + `<div class="tt-row">${a.clat.toFixed(2)}, ${a.clon.toFixed(2)} · charted below</div>`, e.clientX, e.clientY));
+        g.addEventListener("mouseleave", hideTip);
+        gSoil.appendChild(g);
+      });
+      conusSvg.appendChild(gSoil);
+    }
+    ui.gActive = el("g");
+    conusSvg.appendChild(ui.gActive);
+
+    /* insets */
+    ui.insets = {
+      AZ: { svg: document.getElementById("inset-az"), bbox: [-112.55, -108.05, 32.5, 35.6], cntEl: document.getElementById("az-cnt") },
+      FL: { svg: document.getElementById("inset-fl"), bbox: [-82.05, -80.0, 24.9, 29.6],    cntEl: document.getElementById("fl-cnt") },
+    };
+    Object.values(ui.insets).forEach((def) => {
+      def.proj = localProj(def.bbox, 300, 220, 16);
+      def.svg.setAttribute("style", "overflow:hidden;border-radius:6px");
+      const dIns = CONUS.features.map((f) => pathFor(f.geometry, def.proj));
+      const gS = el("g");
+      dIns.forEach((d) => gS.appendChild(el("path", { d, class: "state" })));
+      def.svg.appendChild(gS);
+      def.imgDanger = null;
+      if (B.danger) {
+        const [tx1, ty1] = def.proj(def.bbox[0], def.bbox[3]);
+        const [tx2, ty2] = def.proj(def.bbox[1], def.bbox[2]);
+        def.imgDanger = el("image", {
+          x: tx1.toFixed(1), y: ty1.toFixed(1),
+          width: (tx2 - tx1).toFixed(1), height: (ty2 - ty1).toFixed(1),
+          preserveAspectRatio: "none", class: "danger-img", style: "display:none",
+        });
+        def.svg.appendChild(def.imgDanger);
+        const gL = el("g");
+        dIns.forEach((d) => gL.appendChild(el("path", { d, class: "state-line" })));
+        def.svg.appendChild(gL);
+      }
+      const gb = el("g");
+      B.fires.filter((f) => inBox(f, def.bbox)).forEach((f) => {
+        const [x1, y1] = def.proj(f.lon_l, f.lat_u), [x2, y2] = def.proj(f.lon_u, f.lat_l);
+        gb.appendChild(el("rect", { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1), class: "ibox-base" }));
+      });
+      def.svg.appendChild(gb);
+      def.gDots = el("g");
+      def.svg.appendChild(def.gDots);
+      def.gActive = el("g");
+      def.svg.appendChild(def.gActive);
+    });
+
+    /* map note */
+    const insetBoxes = Object.values(ui.insets).map((d) => d.bbox);
+    const conusOnly = B.fires.filter((f) => !insetBoxes.some((bb) => inBox(f, bb)));
+    document.getElementById("map-note").textContent = conusOnly.length
+      ? `Insets zoom the dense clusters. ${conusOnly.length} isolated fire${conusOnly.length > 1 ? "s" : ""} (${[...new Set(conusOnly.map((f) => REG[f.region].name))].join(", ")}) appear on the national map only.`
+      : "Insets zoom the two dense clusters — every prioritized fire in this window falls inside one of them. Click a box or roster card for full detection detail.";
+
+    /* legend */
+    const legEl = document.getElementById("legend");
+    ["AZ", "FL", "CA"].forEach((rk) => {
+      const cnt = B.fires.filter((f) => f.region === rk).length;
+      if (!cnt) return;
+      const row = document.createElement("div"); row.className = "leg-row";
+      row.innerHTML = `<span class="sw" style="background:${regColor(rk)}"></span><span class="nm">${REG[rk].name}</span><span class="ct">${cnt}</span>`;
+      legEl.appendChild(row);
+    });
+
+    /* rawif sweep controls */
+    ui.rawifCanvas = document.getElementById("rawif-canvas");
+    ui.rawifHud = document.getElementById("rawif-hud");
+    ui.rawifTime = document.getElementById("rawif-time");
+    ui.rawifPass = document.getElementById("rawif-pass");
+    ui.rawifPause = document.getElementById("rawif-pause");
+    ui.rawifCtl = document.getElementById("rawif-ctl");
+    ui.rawifScrub = document.getElementById("rawif-scrub");
+    ui.rawifSpeed = document.getElementById("rawif-speed");
+    if (ui.rawifPause) ui.rawifPause.onclick = () => setRawifPause(!rawif.paused);
+    if (ui.rawifSpeed) ui.rawifSpeed.onclick = () => {
+      const sp = RW_SPEEDS;
+      rawif.speed = sp[(sp.indexOf(rawif.speed) + 1) % sp.length];
+      syncRawifSpeed();
+    };
+    const rjb = (id, fn) => { const b = document.getElementById(id); if (b) b.onclick = fn; };
+    rjb("rawif-prevp", () => rawifPassJump(-1));
+    rjb("rawif-nextp", () => rawifPassJump(1));
+    rjb("rawif-back", () => rawifNudge(-900));
+    rjb("rawif-fwd", () => rawifNudge(900));
+    if (ui.rawifScrub) {
+      ui.rawifScrub.addEventListener("input", () => {     // drag: freeze + seek
+        if (!rawif.data) return;
+        rawif.scrubbing = true;
+        if (rawif.raf) { cancelAnimationFrame(rawif.raf); rawif.raf = 0; }
+        rawifSetU(+ui.rawifScrub.value / 1000 * rawif.data.total);
+      });
+      ui.rawifScrub.addEventListener("change", () => {    // release: resume
+        rawif.scrubbing = false;
+        if (!rawif.paused && rawif.on && rawif.data && !rawif.raf) {
+          rawif.last = performance.now();
+          rawif.raf = requestAnimationFrame(rawifFrame);
+        }
+      });
+    }
+    const rbtn = document.getElementById("rawifbtn");
+    if (rbtn) {
+      rbtn.setAttribute("aria-pressed", String(rawif.on));
+      rbtn.onclick = () => {
+        rawif.on = !rawif.on;
+        localStorage.setItem("fire-rawif-layer", rawif.on ? "on" : "off");
+        rbtn.setAttribute("aria-pressed", String(rawif.on));
+        updateRawif();
+        prefetchRawif();
+      };
+    }
+
+    /* danger layer controls */
+    ui.dangerOn = localStorage.getItem("fire-danger-layer") !== "off";
+    const dbtn = document.getElementById("dangerbtn");
+    if (dbtn) {
+      dbtn.setAttribute("aria-pressed", String(ui.dangerOn));
+      dbtn.onclick = () => {
+        ui.dangerOn = !ui.dangerOn;
+        localStorage.setItem("fire-danger-layer", ui.dangerOn ? "on" : "off");
+        dbtn.setAttribute("aria-pressed", String(ui.dangerOn));
+        updateDanger();
+      };
+    }
+    const dramp = document.getElementById("dramp");
+    if (dramp && B.danger) {
+      B.danger.legend.forEach((b) => {
+        const sw = document.createElement("i");
+        sw.style.flexGrow = String(b[1] - b[0] + 1);
+        sw.style.background = `rgb(${b[2][0]},${b[2][1]},${b[2][2]})`;
+        dramp.appendChild(sw);
+      });
+    }
+
+    /* ticks + scrub */
+    const ticksEl = document.getElementById("ticks");
+    const showEvery = new Set([0, Math.floor((N - 1) / 3), Math.floor(2 * (N - 1) / 3), N - 1]);
+    for (let i = 0; i < N; i++) {
+      const b = document.createElement("button");
+      b.className = "tick"; b.dataset.i = i; b.type = "button";
+      b.setAttribute("aria-label", "Go to " + B.dates[i]);
+      if (showEvery.has(i)) b.dataset.show = "1";
+      b.innerHTML = `<span class="bar"></span><span class="tlab">${fmtShort(B.dates[i])}</span>`;
+      b.addEventListener("click", () => setDay(i));
+      ticksEl.appendChild(b);
+    }
+    ui.ticksEl = ticksEl;
+    ui.scrub = document.getElementById("scrub");
+    ui.scrub.addEventListener("input", () => setDay(+ui.scrub.value, false));
+
+    /* transport */
+    const playBtn = document.getElementById("play");
+    ui.playBtn = playBtn; ui.playLbl = document.getElementById("playlbl");
+    playBtn.addEventListener("click", () => setPlay(!playing));
+    document.getElementById("prev").addEventListener("click", () => { setPlay(false); setDay(cur - 1); });
+    document.getElementById("next").addEventListener("click", () => { setPlay(false); setDay(cur + 1); });
+    document.querySelectorAll(".speeds button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        stepMs = +btn.dataset.ms;
+        document.querySelectorAll(".speeds button").forEach((b2) => b2.setAttribute("aria-pressed", b2 === btn ? "true" : "false"));
+        if (playing) setPlay(true);
+      });
+    });
+    syncPlayUI();
+
+    buildTrend();
+    buildGantt();
+    if (B.soil) buildSoil();
+  }
+
+  /* ---------- soil moisture ---------- */
+  function buildSoil() {
+    const gridEl = document.getElementById("soil-grid");
+    if (!gridEl) return;
+    const units = B.soil.units, dom = B.soil.domain;
+    const sramp = document.getElementById("sramp");
+    B.soil.colormap.forEach((c) => {
+      const i = document.createElement("i");
+      i.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
+      sramp.appendChild(i);
+    });
+    const snote = document.getElementById("snote");
+    if (snote) snote.textContent = `${dom[0]}–${dom[1]}${units ? " " + units : ""} · pixels outside the retrieval footprint are transparent`;
+
+    ui.soil = { sites: {} };
+    B.soil.areas.forEach((a) => {
+      const bbox = soilBbox(a);
+      const kx = Math.cos((bbox[2] + bbox[3]) / 2 * Math.PI / 180);
+      const MW = 300;
+      const MH = Math.max(96, Math.min(240, Math.round(MW * (bbox[3] - bbox[2]) / ((bbox[1] - bbox[0]) * kx))));
+      const panel = document.createElement("div");
+      panel.className = "soil-site";
+      panel.innerHTML =
+        `<div class="ss-head"><div><div class="ss-nm">${esc(a.label)}</div>`
+        + `<div class="ss-co">${a.clat.toFixed(2)}, ${a.clon.toFixed(2)} · ${a.region_name}</div></div>`
+        + `<div class="ss-val"><span class="ss-v" id="sv-${a.id}">—</span>${units ? `<span class="ss-u">${units}</span>` : ""}</div></div>`
+        + `<div class="ss-map"><svg id="sm-${a.id}" viewBox="0 0 ${MW} ${MH}" role="img" aria-label="Soil-moisture field for ${esc(a.label)}"></svg></div>`
+        + `<svg class="ss-spark" id="ssp-${a.id}" viewBox="0 0 300 66" role="img" aria-label="Daily area-mean soil moisture for ${esc(a.label)}"></svg>`;
+      gridEl.appendChild(panel);
+
+      const svg = panel.querySelector(`#sm-${a.id}`);
+      const proj = localProj(bbox, MW, MH, 0);
+      const gS = el("g");
+      CONUS.features.forEach((ft) => gS.appendChild(el("path", { d: pathFor(ft.geometry, proj), class: "state" })));
+      svg.appendChild(gS);
+      const [ix1, iy1] = proj(bbox[0], bbox[3]), [ix2, iy2] = proj(bbox[1], bbox[2]);
+      const img = el("image", {
+        x: Math.min(ix1, ix2).toFixed(1), y: Math.min(iy1, iy2).toFixed(1),
+        width: Math.abs(ix2 - ix1).toFixed(1), height: Math.abs(iy2 - iy1).toFixed(1),
+        preserveAspectRatio: "none", class: "soil-img", style: "display:none",
+      });
+      svg.appendChild(img);
+      const [bx1, by1] = proj(a.lon_l, a.lat_u), [bx2, by2] = proj(a.lon_u, a.lat_l);
+      svg.appendChild(el("rect", {
+        x: Math.min(bx1, bx2), y: Math.min(by1, by2),
+        width: Math.abs(bx2 - bx1), height: Math.abs(by2 - by1), class: "ss-box",
+      }));
+      const none = el("text", { x: MW / 2, y: MH / 2, class: "ss-none", style: "display:none" });
+      none.textContent = "no retrieval this day";
+      svg.appendChild(none);
+
+      const spark = buildSoilSpark(panel.querySelector(`#ssp-${a.id}`), a);
+      ui.soil.sites[a.id] = { img, none, bbox, valEl: panel.querySelector(`#sv-${a.id}`), spark };
+    });
+  }
+
+  function buildSoilSpark(svg, a) {
+    const N = B.dates.length, W = 300, H = 66, padL = 5, padR = 5, padT = 9, padB = 13;
+    const iw = W - padL - padR, ih = H - padT - padB;
+    const dom = B.soil.domain, lo = dom[0], hi = dom[1] > dom[0] ? dom[1] : dom[0] + 1;
+    const span = hi - lo;
+    const x = (i) => padL + (N === 1 ? iw / 2 : i * iw / (N - 1));
+    const y = (v) => padT + ih - (v - lo) / span * ih;
+    const series = B.soil.series[String(a.id)];
+    [lo, hi].forEach((gv) => svg.appendChild(el("line", { x1: padL, y1: y(gv), x2: padL + iw, y2: y(gv), class: "ssp-grid" })));
+    let seg = [];
+    const flush = () => {
+      if (seg.length > 1) svg.appendChild(el("polyline", { points: seg.map((p) => p.join(",")).join(" "), class: "ssp-line" }));
+      else if (seg.length === 1) svg.appendChild(el("circle", { cx: seg[0][0], cy: seg[0][1], r: 2.2, class: "ssp-pt" }));
+      seg = [];
+    };
+    series.forEach((v, i) => { if (v == null) { flush(); return; } seg.push([x(i), y(v)]); });
+    flush();
+    const ph = el("line", { class: "ssp-playhead", y1: padT - 2, y2: padT + ih });
+    svg.appendChild(ph);
+    const cd = el("circle", { r: 3, class: "ssp-cur", style: "display:none" });
+    svg.appendChild(cd);
+    series.forEach((v, i) => {
+      if (v == null) return;
+      const hit = el("circle", { cx: x(i), cy: y(v), r: 8, fill: "transparent", style: "cursor:pointer" });
+      hit.addEventListener("mousemove", (e) => showTip(
+        `<div class="tt-nm"><span class="tt-sw" style="background:${cssv("--soil")}"></span>${esc(a.label)}</div>`
+        + `<div class="tt-row">${fmtShort(B.dates[i])}: ${v}${B.soil.units ? " " + B.soil.units : ""} soil moisture</div>`, e.clientX, e.clientY));
+      hit.addEventListener("mouseleave", hideTip);
+      hit.addEventListener("click", () => setDay(i));
+      svg.appendChild(hit);
+    });
+    return { x, y, ph, cd };
+  }
+
+  /* ---------- trend chart ---------- */
+  function buildTrend() {
+    const N = B.dates.length;
+    const svg = document.getElementById("trend");
+    const padL = 46, padR = 132, padT = 16, padB = 30, W = 960, H = 270;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const iw = W - padL - padR, ih = H - padT - padB;
+    const x = (i) => padL + (N === 1 ? iw / 2 : i * iw / (N - 1));
+    const y = (pct) => padT + ih - pct / 100 * ih;
+    ui.trendX = x; ui.trendTop = padT; ui.trendBot = padT + ih;
+
+    [0, 25, 50, 75, 100].forEach((p) => {
+      svg.appendChild(el("line", { x1: padL, y1: y(p), x2: padL + iw, y2: y(p), class: "grid-h" }));
+      const t = el("text", { x: padL - 7, y: y(p) + 3, class: "ax-lab", "text-anchor": "end" });
+      t.textContent = p + "%";
+      svg.appendChild(t);
+    });
+    ui.trendCols = el("g");
+    for (let i = 0; i < N; i++) {
+      const t = el("text", { x: x(i), y: H - 10, class: "gcol-lab", "data-i": i });
+      t.textContent = fmtDay(B.dates[i]);
+      ui.trendCols.appendChild(t);
+    }
+    svg.appendChild(ui.trendCols);
+    ui.trendPlayhead = el("line", { class: "gplayhead", y1: padT - 4, y2: padT + ih });
+    svg.appendChild(ui.trendPlayhead);
+
+    // series groups, then endpoint label de-overlap
+    const groups = [];
+    B.fires.forEach((f) => {
+      const g = el("g", { class: "trend-g", "data-id": f.id });
+      const col = regColor(f.region);
+      let seg = [], lastPt = null;
+      const flush = () => {
+        if (seg.length > 1) g.appendChild(el("polyline", { points: seg.map((p) => p.join(",")).join(" "), class: "trend-line", stroke: col }));
+        else if (seg.length === 1) g.appendChild(el("circle", { cx: seg[0][0], cy: seg[0][1], r: 3.5, fill: col, class: "trend-pt" }));
+        seg = [];
+      };
+      f.series.forEach((s, i) => {
+        if (!s || !s[0]) { flush(); return; }
+        const px = x(i), py = y(100 * s[1] / s[0]);
+        seg.push([px, py]);
+        lastPt = [px, py, i];
+        const hit = el("circle", { cx: px, cy: py, r: 9, fill: "transparent", style: "cursor:pointer" });
+        hit.addEventListener("mousemove", (e) => { hotTrend(f.id); showTip(fireTip(f, i), e.clientX, e.clientY); });
+        hit.addEventListener("mouseleave", () => { hotTrend(null); hideTip(); });
+        hit.addEventListener("click", () => openDetail(f.id));
+        g.appendChild(hit);
+      });
+      flush();
+      svg.appendChild(g);
+      if (lastPt) groups.push({ g, f, lx: lastPt[0] + 8, ly: lastPt[1] });
+    });
+    groups.sort((a, b) => a.ly - b.ly);
+    for (let i = 1; i < groups.length; i++) {
+      if (groups[i].ly - groups[i - 1].ly < 13) groups[i].ly = groups[i - 1].ly + 13;
+    }
+    groups.forEach(({ g, f, lx, ly }) => {
+      const t = el("text", { x: lx, y: ly + 4, class: "trend-lab" });
+      t.textContent = f.name.replace(/_/g, " ");
+      g.appendChild(t);
+    });
+    ui.trendSvg = svg;
+  }
+  function hotTrend(id) {
+    ui.trendSvg.querySelectorAll(".trend-g").forEach((g) => {
+      g.classList.toggle("trend-hot", id !== null && g.dataset.id === id);
+      g.classList.toggle("trend-dim", id !== null && g.dataset.id !== id);
+    });
+  }
+
+  /* ---------- gantt ---------- */
+  function buildGantt() {
+    const N = B.dates.length;
+    const gantt = document.getElementById("gantt");
+    const padL = 168, padR = 46, padT = 30, rowH = 22, gap = 4, iw = 640;
+    const rows = B.fires;
+    const GW = padL + iw + padR, GH = padT + rows.length * (rowH + gap) + 12;
+    gantt.setAttribute("viewBox", `0 0 ${GW} ${GH}`);
+    const colW = iw / N;
+    const colX = (i) => padL + i * colW + colW / 2;
+    const cellW = Math.min(colW - 5, 26);
+    ui.ganttColX = colX; ui.ganttCellW = cellW; ui.ganttPadT = padT; ui.ganttRowH = rowH; ui.ganttGap = gap;
+
+    ui.gBand = el("rect", { class: "gband", x: 0, y: padT - 6, width: cellW + 8, height: rows.length * (rowH + gap) + 4 });
+    gantt.appendChild(ui.gBand);
+    ui.gCols = el("g");
+    for (let i = 0; i < N; i++) {
+      const t = el("text", { x: colX(i), y: 16, class: "gcol-lab", "data-i": i });
+      t.textContent = fmtDay(B.dates[i]);
+      ui.gCols.appendChild(t);
+    }
+    gantt.appendChild(ui.gCols);
+
+    rows.forEach((f, ri) => {
+      const yy = padT + ri * (rowH + gap);
+      gantt.appendChild(el("line", { x1: padL - 8, y1: yy + rowH + gap / 2, x2: GW - padR, y2: yy + rowH + gap / 2, class: "growline" }));
+      const lab = el("text", { x: 10, y: yy + 10, class: "grow-label" + (f.days_count < 3 ? " dim" : "") });
+      lab.textContent = f.name.replace(/_/g, " ");
+      lab.addEventListener("click", () => openDetail(f.id));
+      gantt.appendChild(lab);
+      const reg = el("text", { x: 10, y: yy + 19.5, class: "grow-region" });
+      reg.textContent = REG[f.region].name;
+      gantt.appendChild(reg);
+      const x1 = colX(f.first_day) - cellW / 2, x2 = colX(f.last_day) + cellW / 2;
+      gantt.appendChild(el("rect", { class: "gbar", x: x1, y: yy + 3, width: Math.max(cellW, x2 - x1), height: rowH - 6, fill: regColor(f.region) }));
+      const dd = el("text", { x: GW - padR + 8, y: yy + rowH * 0.66, class: "gdays" });
+      dd.textContent = f.days_count + "d";
+      gantt.appendChild(dd);
+      const hit = el("rect", { x: 0, y: yy, width: GW, height: rowH + gap, fill: "transparent", style: "cursor:pointer" });
+      hit.addEventListener("mousemove", (e) => showTip(fireTip(f, cur), e.clientX, e.clientY));
+      hit.addEventListener("mouseleave", hideTip);
+      hit.addEventListener("click", () => openDetail(f.id));
+      gantt.appendChild(hit);
+    });
+    ui.gCur = el("g"); gantt.appendChild(ui.gCur);
+    ui.gPlayhead = el("line", { class: "gplayhead", y1: padT - 6, y2: padT + rows.length * (rowH + gap) - 2 });
+    gantt.appendChild(ui.gPlayhead);
+    ui.ganttSvg = gantt;
+  }
+
+  /* ================= render one day ================= */
+  function setDay(i, syncScrub = true) {
+    cur = Math.max(0, Math.min(B.dates.length - 1, i | 0));
+    if (syncScrub && ui.scrub) ui.scrub.value = String(cur);
+    render();
+    if (detailFireId) renderDetail();
+  }
+
+  function updateDanger() {
+    if (!B.danger) return;
+    const dday = B.days[cur].day;
+    const tok = B.danger.days[dday];
+    const show = !!(ui.dangerOn && tok);
+    const setImg = (img, url) => {
+      if (!img) return;
+      if (!show) { img.style.display = "none"; return; }
+      if (img.dataset.url !== url) { img.setAttribute("href", url); img.dataset.url = url; }
+      img.style.display = "";
+    };
+    setImg(ui.imgDanger, show ? rawUrl("/api/danger", { day: dday, view: "conus", v: tok }) : "");
+    Object.values(ui.insets).forEach((def) =>
+      setImg(def.imgDanger, show ? rawUrl("/api/danger", { day: dday, view: "geo", bbox: def.bbox.join(","), w: 600, v: tok }) : ""));
+    const note = document.getElementById("dnote");
+    if (note) {
+      note.textContent = !ui.dangerOn ? "layer hidden"
+        : tok ? "water & non-burnable transparent" : "no WFPI Day-1 product for this date";
+    }
+  }
+
+  function updateSoil() {
+    if (!B.soil || !ui.soil) return;
+    const dday = B.dates[cur].replace(/-/g, "");
+    const tok = B.soil.days[dday];
+    B.soil.areas.forEach((a) => {
+      const st = ui.soil.sites[a.id];
+      if (!st) return;
+      const val = B.soil.series[String(a.id)][cur];
+      st.valEl.textContent = (val == null) ? "—" : val;
+      if (tok && val != null) {
+        const url = rawUrl("/api/soil", { day: dday, area: a.id, bbox: st.bbox.join(","), w: 320, v: tok });
+        if (st.img.dataset.url !== url) { st.img.setAttribute("href", url); st.img.dataset.url = url; }
+        st.img.style.display = "";
+        st.none.style.display = "none";
+      } else {
+        st.img.style.display = "none";
+        st.none.style.display = "";
+      }
+      const sp = st.spark;
+      sp.ph.setAttribute("x1", sp.x(cur)); sp.ph.setAttribute("x2", sp.x(cur));
+      if (val == null) { sp.cd.style.display = "none"; }
+      else { sp.cd.style.display = ""; sp.cd.setAttribute("cx", sp.x(cur)); sp.cd.setAttribute("cy", sp.y(val)); }
+    });
+  }
+
+  /* ---------- RawIF sweep — commanded raw-IF captures at actual specular points ----------
+     /api/rawif serves one day's track as time-sorted arrays (t = UTC second of
+     day, lat/lon = specular point). A rAF loop sweeps a clock through the day
+     at RW_RATE day-seconds per real second, drawing every point inside the
+     trailing RW_TRAIL window on the canvas overlay (newest opaque, oldest
+     faded). Consecutive points more than RW_GAP apart split the day into
+     passes; the sweep jumps across the idle gaps between them. */
+  const RW_RATE = 1440;    // day-seconds per real second (full day ≙ 60 s)
+  const RW_TRAIL = 1500;   // seconds of day a dot stays visible
+  const RW_GAP = 1800;     // silence longer than this starts a new pass
+  const RW_LEAD = 120;     // lead-in before each pass
+  const RW_SPEEDS = [0.25, 0.5, 1, 2, 4];   // playback multipliers on RW_RATE
+  const rawifCache = new Map();   // dday -> Promise<track|null>
+  const rawif = { on: localStorage.getItem("fire-rawif-layer") !== "off", paused: false,
+                  data: null, si: 0, tNow: 0, raf: 0, last: 0, seq: 0, spr: null,
+                  speed: 1, scrubbing: false };
+
+  function prepRawif(d) {
+    if (!d || !d.n) return null;
+    /* project once — projC only depends on the (static) CONUS geometry */
+    const xs = new Float32Array(d.n), ys = new Float32Array(d.n);
+    for (let i = 0; i < d.n; i++) {
+      const p = ui.projC(d.lon[i], d.lat[i]);
+      xs[i] = p[0]; ys[i] = p[1];
+    }
+    const t = d.t, segs = [];
+    let s0 = 0;
+    for (let i = 1; i <= d.n; i++) {
+      if (i === d.n || t[i] - t[i - 1] > RW_GAP) { segs.push([t[s0], t[i - 1]]); s0 = i; }
+    }
+    const hasTags = !!(d.sats && d.s);   // per-point satellite index (NORAD tag)
+    /* scrub timeline: passes concatenated (lead + dwell + trail), gaps dropped */
+    const off = new Float64Array(segs.length);
+    let total = 0;
+    for (let i = 0; i < segs.length; i++) {
+      off[i] = total;
+      total += RW_LEAD + (segs[i][1] - segs[i][0]) + RW_TRAIL;
+    }
+    return { t, xs, ys, n: d.n, segs, off, total,
+             sats: hasTags ? d.sats : null, ss: hasTags ? Uint8Array.from(d.s) : null };
+  }
+  const getRawif = (dday) => {
+    if (!B.rawif || !B.rawif.days[dday]) return Promise.resolve(null);
+    if (!rawifCache.has(dday)) {
+      rawifCache.set(dday, api("/api/rawif", { day: dday, v: B.rawif.days[dday] })
+        .then(prepRawif).catch(() => null));
+    }
+    return rawifCache.get(dday);
+  };
+  function rawifSprite() {   // pre-rendered dot: fast round drawImage stamps
+    const c = document.createElement("canvas");
+    c.width = c.height = 16;
+    const g = c.getContext("2d");
+    g.fillStyle = cssv("--rawif");
+    g.beginPath(); g.arc(8, 8, 7, 0, 2 * Math.PI); g.fill();
+    return c;
+  }
+  function stopRawif() {
+    if (rawif.raf) { cancelAnimationFrame(rawif.raf); rawif.raf = 0; }
+    if (ui.rawifCanvas) {
+      const g = ui.rawifCanvas.getContext("2d");
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, ui.rawifCanvas.width, ui.rawifCanvas.height);
+    }
+  }
+  const rwClock = (t) => {
+    const s = Math.max(0, Math.min(86399, t | 0));
+    return String(Math.floor(s / 3600)).padStart(2, "0") + ":" + String(Math.floor(s / 60) % 60).padStart(2, "0");
+  };
+  /* seek helpers — u is position on the scrub timeline (gaps compressed) */
+  const rawifBlockLen = (d, si) => RW_LEAD + (d.segs[si][1] - d.segs[si][0]) + RW_TRAIL;
+  function rawifU() {
+    const d = rawif.data;
+    const base = d.segs[rawif.si][0] - RW_LEAD;
+    return d.off[rawif.si] + Math.max(0, Math.min(rawif.tNow - base, rawifBlockLen(d, rawif.si)));
+  }
+  function rawifSetU(u) {
+    const d = rawif.data;
+    if (!d || !d.segs.length) return;
+    u = Math.max(0, Math.min(d.total - 1e-3, u));
+    let si = 0;
+    while (si + 1 < d.segs.length && u >= d.off[si + 1]) si++;
+    rawif.si = si;
+    rawif.tNow = d.segs[si][0] - RW_LEAD + (u - d.off[si]);
+    rawifRender();
+  }
+  function rawifNudge(secs) {          // ±day-seconds, hops across idle gaps
+    if (rawif.data) rawifSetU(rawifU() + secs);
+  }
+  function rawifPassJump(dir) {
+    const d = rawif.data;
+    if (!d || !d.segs.length) return;
+    let si = rawif.si;
+    if (dir < 0) {                     // well into a pass: restart it; else previous
+      const into = rawif.tNow - (d.segs[si][0] - RW_LEAD);
+      si = into > RW_LEAD + 300 ? si : (si - 1 + d.segs.length) % d.segs.length;
+    } else {
+      si = (si + 1) % d.segs.length;
+    }
+    rawif.si = si;
+    rawif.tNow = d.segs[si][0] - RW_LEAD;
+    rawifRender();
+  }
+  function syncRawifSpeed() {
+    if (ui.rawifSpeed) ui.rawifSpeed.textContent = (rawif.speed < 1 ? rawif.speed.toString().replace("0.", ".") : rawif.speed) + "×";
+  }
+  function rawifRender() {   // draw the trailing window at the current tNow
+    const d = rawif.data, cv = ui.rawifCanvas;
+    if (!d || !d.segs.length || !cv) return;
+    /* backing store tracks rendered size; transform maps svg viewBox space */
+    const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    const W = Math.max(1, Math.round(r.width * dpr)), H = Math.max(1, Math.round(r.height * dpr));
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const g = cv.getContext("2d");
+    g.setTransform(W / 960, 0, 0, H / 590, 0, 0);
+    g.clearRect(0, 0, 960, 590);
+    const t = d.t, t1 = rawif.tNow, t0 = t1 - RW_TRAIL;
+    let lo = 0, hi = d.n;                          // lower bound of the window
+    while (lo < hi) { const m = (lo + hi) >> 1; if (t[m] < t0) lo = m + 1; else hi = m; }
+    const head = d.sats ? new Int32Array(d.sats.length).fill(-1) : null;
+    for (let i = lo; i < d.n && t[i] <= t1; i++) {
+      g.globalAlpha = 0.15 + 0.85 * (1 - (t1 - t[i]) / RW_TRAIL);
+      g.drawImage(rawif.spr, d.xs[i] - 1.7, d.ys[i] - 1.7, 3.4, 3.4);
+      if (head) head[d.ss[i]] = i;                 // newest visible dot per sat
+    }
+    if (head) {                                    // NORAD tag rides the leading dot
+      g.font = "600 10px ui-monospace, Menlo, Consolas, monospace";
+      g.textBaseline = "middle";
+      g.lineJoin = "round";
+      g.lineWidth = 2.6;
+      for (let si = 0; si < head.length; si++) {
+        const i = head[si];
+        if (i < 0) continue;
+        g.globalAlpha = Math.max(0.35, 0.15 + 0.85 * (1 - (t1 - t[i]) / RW_TRAIL));
+        g.strokeStyle = rawif.halo;
+        g.strokeText(d.sats[si], d.xs[i] + 4.5, d.ys[i] - 4.5);
+        g.fillStyle = rawif.ink;
+        g.fillText(d.sats[si], d.xs[i] + 4.5, d.ys[i] - 4.5);
+      }
+    }
+    g.globalAlpha = 1;
+    ui.rawifTime.textContent = rwClock(rawif.tNow);
+    ui.rawifPass.textContent = "pass " + (rawif.si + 1) + "/" + d.segs.length
+      + (rawif.paused ? " · paused" : "");
+    if (ui.rawifScrub && !rawif.scrubbing) {
+      ui.rawifScrub.value = String(Math.round(rawifU() / d.total * 1000));
+    }
+  }
+  function rawifFrame(ts) {
+    rawif.raf = 0;
+    const d = rawif.data;
+    if (!rawif.on || rawif.paused || !d || !d.segs.length || !ui.rawifCanvas) return;
+    const dt = Math.min(0.1, Math.max(0, (ts - rawif.last) / 1000));
+    rawif.last = ts;
+    rawif.tNow += dt * RW_RATE * rawif.speed;
+    if (rawif.tNow > d.segs[rawif.si][1] + RW_TRAIL) {   // pass over — skip idle gap
+      rawif.si = (rawif.si + 1) % d.segs.length;
+      rawif.tNow = d.segs[rawif.si][0] - RW_LEAD;
+    }
+    rawifRender();
+    rawif.raf = requestAnimationFrame(rawifFrame);
+  }
+  function syncRawifPause() {
+    const b = ui.rawifPause;
+    if (!b) return;
+    b.innerHTML = rawif.paused
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="7,4 21,12 7,20"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>';
+    b.setAttribute("aria-label", rawif.paused ? "Resume sweep" : "Pause sweep");
+    b.title = rawif.paused ? "resume sweep" : "pause sweep";
+  }
+  function setRawifPause(p) {
+    rawif.paused = p;
+    syncRawifPause();
+    if (rawif.raf) { cancelAnimationFrame(rawif.raf); rawif.raf = 0; }
+    if (rawif.data && rawif.data.segs.length) rawifRender();   // refresh HUD/frame
+    if (!p && rawif.on && rawif.data && rawif.data.segs.length) {
+      rawif.last = performance.now();
+      rawif.raf = requestAnimationFrame(rawifFrame);
+    }
+  }
+  function updateRawif() {
+    if (!ui.rawifCanvas) return;
+    const seq = ++rawif.seq;
+    stopRawif();
+    rawif.data = null;
+    rawif.scrubbing = false;
+    const hud = ui.rawifHud;
+    if (ui.rawifCtl) ui.rawifCtl.style.display = "none";
+    if (ui.rawifSpeed) ui.rawifSpeed.style.display = "none";
+    if (!rawif.on) { hud.style.display = "none"; return; }
+    const dday = B.days[cur].day;
+    if (!B.rawif.days[dday]) {
+      hud.style.display = "";
+      ui.rawifTime.textContent = "--:--";
+      ui.rawifPass.textContent = "no plan/trajectory for this date";
+      return;
+    }
+    getRawif(dday).then((d) => {
+      if (seq !== rawif.seq || !rawif.on) return;
+      hud.style.display = "";
+      if (!d || !d.segs.length) {
+        ui.rawifTime.textContent = "--:--";
+        ui.rawifPass.textContent = "no captures this date";
+        return;
+      }
+      rawif.data = d;
+      rawif.si = 0;
+      rawif.tNow = d.segs[0][0] - RW_LEAD;
+      rawif.spr = rawifSprite();
+      rawif.ink = cssv("--rawif");     // tag colors, re-read on theme rebuild
+      rawif.halo = cssv("--surface");
+      if (ui.rawifCtl) ui.rawifCtl.style.display = "";
+      if (ui.rawifSpeed) ui.rawifSpeed.style.display = "";
+      syncRawifPause();
+      syncRawifSpeed();
+      rawifRender();                       // first frame shows even when paused
+      if (!rawif.paused) {
+        rawif.last = performance.now();
+        rawif.raf = requestAnimationFrame(rawifFrame);
+      }
+    });
+  }
+  window.addEventListener("resize", () => {   // keep a paused frame crisp
+    if (rawif.on && rawif.paused) rawifRender();
+  });
+  function prefetchRawif() {   // warm remaining days once the layer is in use
+    if (!B.rawif || !rawif.on) return;
+    const days = Object.keys(B.rawif.days);
+    let i = 0;
+    (function next() {
+      if (i >= days.length) return;
+      getRawif(days[i++]).then(() => setTimeout(next, 60));
+    })();
+  }
+
+  /* warm the browser cache so scrubbing/playback never waits on rasters */
+  const prefetched = new Set();
+  function prefetchDanger() {
+    if (!B.danger || !ui.insets) return;
+    const urls = [];
+    Object.keys(B.danger.days).forEach((dday) => {
+      const tok = B.danger.days[dday];
+      urls.push(rawUrl("/api/danger", { day: dday, view: "conus", v: tok }));
+      Object.values(ui.insets).forEach((def) =>
+        urls.push(rawUrl("/api/danger", { day: dday, view: "geo", bbox: def.bbox.join(","), w: 600, v: tok })));
+    });
+    const todo = urls.filter((u) => !prefetched.has(u));
+    let i = 0;
+    (function nextPf() {
+      if (i >= todo.length) return;
+      const u = todo[i++];
+      prefetched.add(u);
+      const im = new Image();
+      im.onload = im.onerror = () => setTimeout(nextPf, 50);
+      im.src = u;
+    })();
+  }
+
+  function prefetchSoil() {
+    if (!B.soil || !ui.soil) return;
+    const urls = [];
+    Object.keys(B.soil.days).forEach((dday) => {
+      const tok = B.soil.days[dday];
+      B.soil.areas.forEach((a) => {
+        const st = ui.soil.sites[a.id];
+        if (st) urls.push(rawUrl("/api/soil", { day: dday, area: a.id, bbox: st.bbox.join(","), w: 320, v: tok }));
+      });
+    });
+    const todo = urls.filter((u) => !prefetched.has(u));
+    let i = 0;
+    (function nextPf() {
+      if (i >= todo.length) return;
+      const u = todo[i++];
+      prefetched.add(u);
+      const im = new Image();
+      im.onload = im.onerror = () => setTimeout(nextPf, 40);
+      im.src = u;
+    })();
+  }
+
+  function render() {
+    const seq = ++renderSeq;
+    const N = B.dates.length;
+    const dateISO = B.dates[cur];
+    const todays = B.days[cur].fires;
+    const activeIds = new Set(todays.map((r) => r.id));
+
+    document.getElementById("nowidx").textContent = (cur + 1) + "/" + N;
+    document.getElementById("nowdate").textContent = fmt(dateISO);
+    document.getElementById("ro-date").textContent = fmt(dateISO);
+    document.getElementById("ro-idx").textContent = "day " + (cur + 1) + " of " + N;
+    document.getElementById("roster-date").textContent = fmtShort(dateISO);
+    ui.ticksEl.querySelectorAll(".tick").forEach((t) => t.dataset.cur = (+t.dataset.i === cur) ? "1" : "0");
+
+    /* CONUS active markers */
+    ui.gActive.textContent = "";
+    B.fires.filter((f) => activeIds.has(f.id)).forEach((f) => {
+      const [x, y] = ui.projC(f.clon, f.clat);
+      const g = el("g", { class: "marker active" });
+      g.appendChild(el("circle", { cx: x, cy: y, r: 11, class: "halo" }));
+      g.appendChild(el("circle", { cx: x, cy: y, r: 5, class: "core", fill: regColor(f.region), stroke: cssv("--ember"), "stroke-width": 1.6 }));
+      g.addEventListener("mousemove", (e) => showTip(fireTip(f, cur), e.clientX, e.clientY));
+      g.addEventListener("mouseleave", hideTip);
+      g.addEventListener("click", () => openDetail(f.id));
+      ui.gActive.appendChild(g);
+    });
+
+    /* insets: boxes now, dots async */
+    Object.values(ui.insets).forEach((def) => {
+      def.gActive.textContent = "";
+      def.gDots.textContent = "";
+      const list = todays.filter((r) => inBox(r, def.bbox));
+      def.cntEl.textContent = list.length + "/" + B.meta.slots_per_day;
+      if (!list.length) {
+        const t = el("text", { x: 150, y: 112, class: "iempty" }); t.textContent = "— none active —";
+        def.gActive.appendChild(t);
+        return;
+      }
+      list.forEach((r) => {
+        const f = B.fires.find((x) => x.id === r.id);
+        const [ax1, ay1] = def.proj(r.lon_l, r.lat_u), [ax2, ay2] = def.proj(r.lon_u, r.lat_l);
+        const bx = Math.min(ax1, ax2), by = Math.min(ay1, ay2), bw = Math.abs(ax2 - ax1), bh = Math.abs(ay2 - ay1);
+        const grp = el("g", { style: "cursor:pointer" });
+        grp.appendChild(el("rect", { x: bx, y: by, width: bw, height: bh, class: "ibox", fill: cssv(REG[r.region].soft), stroke: cssv("--ember") }));
+        grp.appendChild(el("rect", { x: bx, y: by, width: bw, height: bh, fill: "none", stroke: regColor(r.region), "stroke-width": 1.6, rx: 1 }));
+        const lab = el("text", { x: bx + bw / 2, y: by - 3, class: "ilabel", "text-anchor": "middle" });
+        lab.textContent = f.name.replace(/_/g, " ");
+        grp.appendChild(lab);
+        grp.addEventListener("mousemove", (e) => showTip(fireTip(f, cur), e.clientX, e.clientY));
+        grp.addEventListener("mouseleave", hideTip);
+        grp.addEventListener("click", () => openDetail(f.id));
+        def.gActive.appendChild(grp);
+        /* detections (async, guarded) */
+        getDet(B.days[cur].day, f.name).then((det) => {
+          if (!det || seq !== renderSeq) return;
+          const frag = document.createDocumentFragment();
+          for (let k = 0; k < det.n; k++) {
+            const [dx, dy] = def.proj(det.lon[k], det.lat[k]);
+            if (dx < 0 || dx > 300 || dy < 0 || dy > 220) continue;
+            frag.appendChild(det.y[k]
+              ? el("circle", { cx: dx, cy: dy, r: 2.4, fill: cssv("--burn"), opacity: dotOpacity(det.u[k]), class: "det-dot" })
+              : el("circle", { cx: dx, cy: dy, r: 1.9, fill: "none", stroke: cssv("--muted"), "stroke-width": 0.9, opacity: 0.55, class: "det-dot" }));
+          }
+          def.gDots.appendChild(frag);
+        });
+      });
+    });
+
+    /* roster */
+    const rosterEl = document.getElementById("roster");
+    rosterEl.textContent = "";
+    todays.map((r) => B.fires.find((f) => f.id === r.id))
+      .sort((a, b) => b.days_count - a.days_count)
+      .forEach((f) => {
+        const s = f.series[cur];
+        const dv = f.danger ? f.danger[cur] : null;
+        const div = document.createElement("div"); div.className = "fire"; div.tabIndex = 0;
+        div.innerHTML =
+          `<span class="stripe" style="background:${regColor(f.region)}"></span>`
+          + `<div class="body"><div class="nm">${esc(f.name.replace(/_/g, " "))}`
+          + `${f.first_day === cur && cur > 0 ? '<span class="tag-new">new</span>' : ""}</div>`
+          + `<div class="co">${f.clat.toFixed(2)}, ${f.clon.toFixed(2)} · ${REG[f.region].name}`
+          + `${dv != null ? ` · <span class="dsq" style="background:${dangerColor(dv)}"></span>danger ${dv}` : ""}</div>`
+          + (s ? `<div class="obs">${s[0]} obs · <b>${s[1]} burned</b> (${Math.round(100 * s[1] / s[0])}%)</div>`
+               : `<div class="obs">no detections this day</div>`)
+          + `</div><div class="rt"><div class="days">${f.days_count}</div><div class="dl">days</div></div>`;
+        div.addEventListener("mousemove", (e) => showTip(fireTip(f, cur), e.clientX, e.clientY));
+        div.addEventListener("mouseleave", hideTip);
+        div.addEventListener("click", () => { hideTip(); openDetail(f.id); });
+        div.addEventListener("keydown", (e) => { if (e.key === "Enter") openDetail(f.id); });
+        rosterEl.appendChild(div);
+      });
+
+    /* gantt + trend playheads */
+    ui.gPlayhead.setAttribute("x1", ui.ganttColX(cur)); ui.gPlayhead.setAttribute("x2", ui.ganttColX(cur));
+    ui.gBand.setAttribute("x", ui.ganttColX(cur) - ui.ganttCellW / 2 - 4);
+    ui.gCols.querySelectorAll(".gcol-lab").forEach((t) => t.classList.toggle("cur", +t.getAttribute("data-i") === cur));
+    ui.gCur.textContent = "";
+    B.fires.forEach((f, ri) => {
+      if (!f.day_indices.includes(cur)) return;
+      const yy = ui.ganttPadT + ri * (ui.ganttRowH + ui.ganttGap);
+      ui.gCur.appendChild(el("rect", { class: "gcell-cur", x: ui.ganttColX(cur) - ui.ganttCellW / 2, y: yy + 3, width: ui.ganttCellW, height: ui.ganttRowH - 6 }));
+    });
+    ui.trendPlayhead.setAttribute("x1", ui.trendX(cur)); ui.trendPlayhead.setAttribute("x2", ui.trendX(cur));
+    ui.trendCols.querySelectorAll(".gcol-lab").forEach((t) => t.classList.toggle("cur", +t.getAttribute("data-i") === cur));
+
+    updateDanger();
+    updateSoil();
+    if (ui.rawifCanvas) updateRawif();
+  }
+
+  /* ================= detail overlay ================= */
+  const overlay = document.getElementById("overlay");
+  const detailEl = document.getElementById("detail");
+  let detailFireId = null, detailMode = "cum";
+
+  function openDetail(fid) {
+    hideTip();
+    detailFireId = fid;
+    overlay.classList.add("open");
+    renderDetail();
+  }
+  function closeDetail() {
+    detailFireId = null;
+    overlay.classList.remove("open");
+  }
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeDetail(); });
+
+  function renderDetail() {
+    const f = B.fires.find((x) => x.id === detailFireId);
+    if (!f) { closeDetail(); return; }
+    const col = regColor(f.region);
+    const dvd = f.danger ? f.danger[cur] : null;
+    detailEl.innerHTML = `
+      <div class="detail-head">
+        <div class="ttl"><span class="sw" style="background:${col}"></span><h2>${esc(f.name.replace(/_/g, " "))}</h2></div>
+        <button class="close-btn" id="det-close" aria-label="Close">✕</button>
+      </div>
+      <div class="detail-meta">${REG[f.region].name} · fire start ${f.fire_start} · ${f.days_count} days on watchlist · IRWIN ${esc(f.id)}${dvd != null ? ` · WFPI Day-1 danger ${dvd} (${fmtShort(B.dates[cur])})` : ""}</div>
+      <div class="detail-controls">
+        <div class="modes" role="group" aria-label="Detection display mode">
+          <button id="mode-day" aria-pressed="${detailMode === "day"}">Selected day</button>
+          <button id="mode-cum" aria-pressed="${detailMode === "cum"}">Cumulative → day</button>
+        </div>
+        <span class="detail-stat" id="det-stat">loading…</span>
+      </div>
+      <div class="detail-map-hold"><svg id="det-map" viewBox="0 0 700 470" role="img" aria-label="Detection points for this fire."></svg></div>
+      <div class="detail-strip">
+        <h5>burn fraction by day — click to jump</h5>
+        <div class="strip-cells" id="det-strip"></div>
+        <div class="strip-labs" id="det-strip-labs"></div>
+      </div>`;
+    document.getElementById("det-close").onclick = closeDetail;
+    document.getElementById("mode-day").onclick = () => { detailMode = "day"; renderDetail(); };
+    document.getElementById("mode-cum").onclick = () => { detailMode = "cum"; renderDetail(); };
+
+    /* strip */
+    const strip = document.getElementById("det-strip"), labs = document.getElementById("det-strip-labs");
+    B.dates.forEach((d, i) => {
+      const s = f.series[i];
+      const cell = document.createElement("button");
+      cell.className = "strip-cell" + (s ? "" : " off");
+      cell.dataset.cur = i === cur ? "1" : "0";
+      cell.type = "button";
+      if (s) {
+        const pct = Math.round(100 * s[1] / s[0]);
+        cell.title = `${fmtShort(d)}: ${s[0]} obs, ${pct}% burned`;
+        cell.innerHTML = `<span class="fillbar" style="height:${pct}%"></span>`;
+        cell.onclick = () => setDay(i);
+      } else {
+        cell.title = `${fmtShort(d)}: not tasked / no file`;
+        cell.disabled = true;
+      }
+      strip.appendChild(cell);
+      const sp = document.createElement("span"); sp.textContent = fmtDay(d); labs.appendChild(sp);
+    });
+
+    /* map: fetch involved days, then draw */
+    const need = detailMode === "cum" ? f.day_indices.filter((di) => di <= cur) : (f.day_indices.includes(cur) ? [cur] : []);
+    const svg = document.getElementById("det-map");
+    Promise.all(need.map((di) => getDet(B.days[di].day, f.name).then((det) => ({ di, det })))).then((packs) => {
+      if (detailFireId !== f.id) return;
+      packs = packs.filter((p) => p.det);
+      /* frame: fire box ∪ detections, padded */
+      let lonMin = f.lon_l, lonMax = f.lon_u, latMin = f.lat_l, latMax = f.lat_u;
+      packs.forEach(({ det }) => det.lat.forEach((la, k) => {
+        const lo = det.lon[k];
+        if (la < latMin) latMin = la; if (la > latMax) latMax = la;
+        if (lo < lonMin) lonMin = lo; if (lo > lonMax) lonMax = lo;
+      }));
+      const padLon = (lonMax - lonMin) * 0.08, padLat = (latMax - latMin) * 0.08;
+      const proj = localProj([lonMin - padLon, lonMax + padLon, latMin - padLat, latMax + padLat], 700, 470, 10);
+      svg.textContent = "";
+      const gS = el("g");
+      CONUS.features.forEach((ft) => gS.appendChild(el("path", { d: pathFor(ft.geometry, proj), class: "state" })));
+      svg.appendChild(gS);
+      const [bx1, by1] = proj(f.lon_l, f.lat_u), [bx2, by2] = proj(f.lon_u, f.lat_l);
+      svg.appendChild(el("rect", {
+        x: Math.min(bx1, bx2), y: Math.min(by1, by2),
+        width: Math.abs(bx2 - bx1), height: Math.abs(by2 - by1),
+        fill: cssv(REG[f.region].soft), stroke: col, "stroke-width": 1.8, rx: 2,
+      }));
+      let n = 0, nb = 0;
+      const maxDi = Math.max(...need, 0);
+      packs.forEach(({ di, det }) => {
+        /* older days recede slightly in cumulative mode */
+        const age = detailMode === "cum" ? Math.min(0.45, (maxDi - di) * 0.06) : 0;
+        for (let k = 0; k < det.n; k++) {
+          const [dx, dy] = proj(det.lon[k], det.lat[k]);
+          if (dx < 0 || dx > 700 || dy < 0 || dy > 470) continue;
+          n++;
+          if (det.y[k]) {
+            nb++;
+            svg.appendChild(el("circle", { cx: dx, cy: dy, r: 3.4, fill: cssv("--burn"), opacity: Math.max(0.15, dotOpacity(det.u[k]) - age), class: "det-dot" }));
+          } else {
+            svg.appendChild(el("circle", { cx: dx, cy: dy, r: 2.6, fill: "none", stroke: cssv("--muted"), "stroke-width": 1.1, opacity: Math.max(0.12, 0.55 - age), class: "det-dot" }));
+          }
+        }
+      });
+      const scope = detailMode === "cum" ? `through ${fmtShort(B.dates[cur])}` : fmtShort(B.dates[cur]);
+      document.getElementById("det-stat").innerHTML = n
+        ? `${scope}: ${n} obs · <b>${nb} burned</b> (${Math.round(100 * nb / n)}%)`
+        : `${scope}: no detections`;
+    });
+  }
+
+  /* ================= playback / keys ================= */
+  function syncPlayUI() {
+    if (!ui.playBtn) return;
+    ui.playLbl.textContent = playing ? "Pause" : "Play";
+    ui.playBtn.querySelector(".gl").innerHTML = playing
+      ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'
+      : '<polygon points="6,4 20,12 6,20"/>';
+    ui.playBtn.setAttribute("aria-label", playing ? "Pause timeline" : "Play timeline");
+  }
+  function setPlay(on) {
+    playing = on;
+    syncPlayUI();
+    if (timer) { clearInterval(timer); timer = null; }
+    if (on) timer = setInterval(() => setDay(cur >= B.dates.length - 1 ? 0 : cur + 1), stepMs);
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { closeDetail(); return; }
+    if (detailFireId) return;
+    if (e.key === "ArrowRight") { setPlay(false); setDay(cur + 1); }
+    else if (e.key === "ArrowLeft") { setPlay(false); setDay(cur - 1); }
+    else if (e.key === " " || e.code === "Space") { e.preventDefault(); setPlay(!playing); }
+  });
+
+  /* ================= live sync ================= */
+  let version = null;
+  function setLive(ok, msg) {
+    const lv = document.getElementById("live");
+    if (!lv) return;
+    lv.classList.toggle("err", !ok);
+    document.getElementById("live-txt").textContent = msg;
+  }
+  async function poll() {
+    try {
+      const v = await api("/api/version");
+      if (v.version !== version) {
+        version = v.version;
+        const keepDate = B ? B.dates[cur] : null;
+        B = await api("/api/bundle");
+        detCache.clear();
+        rawifCache.clear();
+        buildAll();
+        const idx = keepDate ? B.dates.indexOf(keepDate) : 0;
+        cur = idx >= 0 ? idx : Math.min(cur, B.dates.length - 1);
+        ui.scrub.value = String(cur);
+        render();
+        prefetchDanger();
+        prefetchSoil();
+        prefetchRawif();
+        if (playing) setPlay(true);
+      }
+      setLive(true, "live · synced " + new Date().toLocaleTimeString());
+    } catch (err) {
+      setLive(false, "connection lost — retrying");
+    }
+  }
+
+  /* ================= boot ================= */
+  (async function boot() {
+    try {
+      const [conus, bundle] = await Promise.all([api("/static/conus.json"), api("/api/bundle")]);
+      CONUS = conus; B = bundle; version = bundle.version;
+      if (!B.dates.length) {
+        document.getElementById("boot").textContent = "no day folders found on disk — check FIRE_CONFIG_ROOT";
+        return;
+      }
+      buildAll();
+      setDay(0);
+      prefetchDanger();
+      prefetchSoil();
+      prefetchRawif();
+      setLive(true, "live · synced " + new Date().toLocaleTimeString());
+      setInterval(poll, 5000);
+    } catch (err) {
+      const b = document.getElementById("boot");
+      b.classList.add("err");
+      b.textContent = "failed to reach data server: " + err.message;
+    }
+  })();
+})();
+</script>
+</body>
+</html>

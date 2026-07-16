@@ -1,0 +1,209 @@
+# demo_analysis — DShield 2026 fire demo
+
+Working notes for this folder. Work done July 13–15, 2026 (Claude-assisted):
+analysis and visualization of the burned-area tasking campaign, plus the
+fire-danger (WFPI Day-1), soil-moisture, and RawIF-sweep (planner ×
+orbits_actual) layers. `orbits/` holds the **predicted** orbits the plan was
+built on; `orbits_actual/` holds the **actual** orbits. The console uses
+`planner/output`'s `*_plan.csv` + `orbits_actual/`; `*_choices.txt`,
+`orbits/Grid.csv`, and the TV files are analyzed and documented below but not
+used by the console; solver internals and the per-satellite `orbits/output`
+access/specular predictions are unanalyzed.
+
+## What was built
+
+### `fire-console/` — served web console (the main deliverable)
+
+Interactive fire-watch console served by a **stdlib-only Python server** that
+reads the data below live from disk (nothing baked into the HTML). Run
+`python3 fire-console/server.py` → http://localhost:8000; view from a laptop
+via SSH port forwarding (see `fire-console/README.md`). Features: Albers CONUS
+map with daily tasking footprints, AZ/NM + FL zoom insets with CYGNSS detection
+dots (filled red = burned, hollow = unburned, opacity = classifier confidence),
+play/scrub timeline, per-fire detail overlay with day/cumulative modes,
+burn-fraction trend chart, watchlist persistence Gantt. The page polls
+`/api/version` every 5 s — day folders added/removed on disk appear
+automatically. Added 2026-07-14: toggleable **WFPI Day-1 fire-danger
+backdrop** on the CONUS map + insets (`/api/danger` serves transparent
+indexed PNGs warped server-side into the map's Albers space — pure-stdlib
+TIFF parse, warp-index cache, PNG cache by mtime) and a per-fire box-mean
+danger index in the bundle (`fires[].danger`), roster, tooltips, and detail.
+Added 2026-07-14: **soil-moisture card** — the two fixed retrieval sites, each
+with a day-following retrieved-field thumbnail (dry→wet colormap, `/api/soil`)
+and a daily area-mean sparkline; sites also marked on the CONUS map. Bundle
+`soil` carries per-area daily-mean series, value domain, units, and colormap.
+Added 2026-07-15: toggleable **RawIF sweep** — a canvas overlay on the CONUS
+map animates each day's commanded RawIF captures as black dots (light ink in
+dark theme) at the *actual* specular-point locations: a clock sweeps the UTC
+day at 1440× with a ~25 min trailing fade, idle gaps between passes are
+skipped, and a HUD pill shows the sweep time + pass n/m plus a transport:
+pause/resume, prev/next pass, ±15 min rewind/fast-forward, a scrub slider
+over the day's passes (idle gaps compressed out of the slider's range), and
+a speed cycle ¼×–4× on the base 1440× rate (paused state and speed persist
+across day changes for the session). Added 2026-07-15: each satellite's
+newest visible dot carries a small **NORAD tag** (canvas text, halo'd in
+`--surface`; one tag per sat, not per channel). `/api/rawif?day=`
+joins the planner's per-satellite RawIF seconds to the actual 2 Hz
+trajectories (all 4 channels, first sample per sat-second, ~69k pts/day) and
+serves gzipped time-sorted arrays — `t/lat/lon` plus per-point sat index `s`
+into `sats` (NORAD ids) — cached by input mtimes (~1.2 s cold; the
+fingerprint carries an extraction-version salt `_RAWIF_VER`, currently
+`sat-tags-v3` — bump it if the extraction logic changes, or stale browser
+caches survive). Bundle `rawif.days` maps day → cache token.
+
+⚠️ **Deliberately unfiltered** (user decision 2026-07-15): all 4 channels are
+drawn, including specular points outside CONUS (Gulf, Mexico, ocean) — a
+commanded second captures the whole receiver, and the user wants the
+as-flown picture. A target-matched variant (keep only channels within 50 km
+of the second's intended GPs from `*_choices.txt` × `orbits/Grid.csv`) was
+built and then reverted on request — do not re-add it, or any CONUS
+clipping, unless asked.
+
+⚠️ A **NIFC-perimeter layer in the per-fire detail overlay** (dashed outline
+from `daily_fire_perimeters/` + `/api/perimeter` endpoint + bundle
+`perims.days`) was built 2026-07-15 and then **reverted on request** the same
+day — do not re-add it unless asked. The `daily_fire_perimeters/` data folder
+itself is kept; it is just not wired into the console.
+
+An earlier **static snapshot** (data embedded, no server) is published as a
+claude.ai artifact: https://claude.ai/code/artifact/0a122e8b-5fd7-4945-9938-7d2b09b34f90
+
+## Data layout and facts
+
+### `dshield-demo-configuration/burned-area-config/YYYYMMDD/fires.json`
+
+Daily tasking watchlists — **exactly 5 fires/day** prioritized for burned-area
+satellite observation. Current analysis window: **2026-06-29 → 2026-07-10
+(12 days)** — the 2026-07-11…13 folders were deliberately removed on
+2026-07-14 to trim the analysis period. 8 unique fires by `irwin_id`, each a
+~0.5°×0.6° lat/lon box. Sycamore, Shell, Pocket held all 12 days; Sacaton 9;
+the 5th slot churns (STEAMBOAT → White_Tail → Avocado). Two clusters:
+Arizona/New Mexico ("Southwest") and Florida ("Southeast").
+
+**These config boxes are the source of truth.** The copies at
+`burned-area/output/*/fires.json` have data-derived extents with `-999.0`
+sentinel values — don't use them.
+
+Region naming gotcha: naive "longitude < -100 ⇒ Arizona" mislabels the
+New Mexico fire (Sacaton, lon −108.7); use Southwest/Southeast region names.
+
+### `burned-area/output/YYYYMMDD/burned_<FireName>.csv`
+
+CYGNSS L1 burned-area classifications, one file per fire-day. The columns that
+matter for mapping: `sp_lat`, `sp_lon` (specular point), `y_pred` (0/1 burned),
+`y_uncert` (0.14–0.8). ~11.3k records total over the window, ~51% classified
+burned; **168 rows carry −999.0 sentinel coordinates** and must be filtered.
+
+⚠️ These CSVs embed multi-line reflectivity matrices in quoted fields (files
+are 1.6–22 MB, ~800 MB total). Never count records with `wc -l`; parse with
+Python `csv` after `csv.field_size_limit(10**7)`.
+
+`prediction_info.txt` per day records the original processing paths.
+`sample/` holds one older sample day (20260529).
+
+### `fire-danger/output/YYYYMMDD/{wlfp,wfpi,wfsp}_YYYYMMDD_DayN.zip`
+
+USGS fire-danger forecast rasters, days **20260629 → 20260709 only** (no
+20260710 — the console shows "no WFPI Day-1 product" there). ⚠️ For a given
+day+lead the three product zips (wlfp/wfpi/wfsp) are **byte-identical**, and
+the tif inside is always named `wfpi_*` — the demo packaged one raster under
+all three names. The console reads `wfpi_*_Day1.zip` (switched from wlfp on
+2026-07-14; identical bytes either way). Day1 files do differ across dates. Each zip holds one
+GeoTIFF: 4587×2889, 8-bit, uncompressed strips, palette embedded, 1 km USGS
+CONUS Lambert Azimuthal Equal-Area *sphere* grid (R=6370997, center 45N/100W,
+upper-left −2051000, 753000). Values 0–150 = fire-potential index (13 palette
+bins, dark green → red); 249–254 = land-cover specials (barren/urban/ag/
+snow/water); 255 nodata. Stdlib-parseable — see `_parse_tif` in
+`fire-console/server.py`.
+
+### `soil-moisture/output/YYYYMMDD/soil_moisture_area_id_N.tif`
+
+Retrieved soil moisture at **two fixed monitoring areas** (boxes in
+`dshield-demo-configuration/soil-moisture-config/YYYYMMDD/sm_areas.json`):
+`area_id 1` = **NM** (32.22–32.75 N, −107.16…−106.07), `area_id 2` =
+**TX_panhandle** (35.14–36.59 N, −102.76…−99.32). Boxes are constant across
+days; only the rolling `prod_start/end_date` window changes. Output days
+**20260629 → 20260710** (12 days, matches the burned-area window). Each tif is a
+**32-bit IEEE-float, DEFLATE-compressed, tiled (256×256)** GeoTIFF on the *same*
+USGS CONUS LAEA-sphere 1 km grid as the danger rasters (so `laea_grid`/
+`laea_inv`/`_warp_idx` are reused). NODATA = `-9999` marks pixels outside the
+retrieved footprint (the footprint is a small fraction of the box — NM ≈ 158
+valid px of 106×66). Values are volumetric soil moisture ≈ 0.05–0.15 m³/m³.
+⚠️ Not the same layout as the danger tif — use `_parse_soil_tif` (handles
+tiles + deflate + float), not `_parse_tif`. `sample/output/soil_moisture.tif`
+is one example area tile.
+
+### `planner/output/YYYYMMDD/` — RawIF command plans & targets
+
+Per-satellite planner outputs, days **20260630 → 20260711**, 7 CYGNSS
+satellites (NORAD 41884–88, 41890–91; no 41889). The plan was optimized
+against the **predicted** orbits in `orbits/` (per-day access/specular/
+propagation folders per satellite), *not* the actual orbits.
+
+- `CYG<norad>_plan.csv`: two `#` comment lines, then `second_of_day, Command`
+  rows — `RawIF` (~2.4–2.8k s/sat/day) plus a few `DNL_*` downlink commands
+  (filter them out).
+- `CYG<norad>_choices.txt`: `sec: [{'cmd': 'obs', 'targets': [gp, ...]}]` —
+  the target **grid-point ids** each candidate second would observe (Python
+  literal syntax; only `cmd == 'obs'` entries; every RawIF-commanded second
+  has one). GP ids index `orbits/Grid.csv` (`GP index,lat,lon`; **114,454
+  GPs**, southern-CONUS band lat 22.6–40, lon −128.5…−65.5 — extends slightly
+  into northern Mexico). `dshieldFire.lp`, `solution.sol`, logs = solver
+  internals, unanalyzed. Target values from
+  `dshield-demo-configuration/active-fire-priority-proxy/*/TV_ACTIVE_FIRE.csv`
+  (114,455 rows, GP-indexed).
+
+### `daily_fire_perimeters/YYYYMMDD/<Fire>.geojson`
+
+NIFC WFIGS perimeters (fetched live 2026-07-15 from
+`WFIGS_Daily_Perimeters_Public`, matched by `irwin_id`) for the burned-area
+fires, dates **20260629 → 20260711**. Per date: latest record with
+`poly_DateCurrent` ≤ end of that UTC day; carried forward when stale
+(`properties.carried_forward`/`days_stale`; `manifest.csv` indexes all
+date × fire statuses). ⚠️ Rookery has **no polygon in any NIFC service** —
+only `Rookery_incident_point.geojson`; White_Tail's single perimeter starts
+07-02; Shell's is ~30 days stale (contained in May). Don't trust
+`poly_PolygonDateTime` (nulls + 2027 year typos) — see the folder README.
+
+### `orbits_actual/specular_trajectory_YYYY-MM-DD.csv`
+
+**Actual** specular-point trajectories (vs the predicted `orbits/` used for
+planning), days **2026-06-30 → 2026-07-09** (~170 MB, ~1.19M rows/day).
+Columns: `spacecraft, cygnss_norad, time` (UTC timestamp at 2 Hz, fixed
+layout — parse HH:MM:SS by slicing chars 11:19) then
+`sp_lat_chN, sp_lon_chN, norad_chN` for channels 1–4 (norad_chN = the GPS
+transmitter, not the CYGNSS sat). Join to plans on `cygnss_norad` +
+floor(second-of-day). RawIF-animatable days = plans ∩ trajectories =
+**20260630 → 20260709** (console days 06-29 and 07-10 show "no
+plan/trajectory" in the HUD).
+
+Facts worth keeping (measured 2026-07-15): a commanded RawIF second captures
+**all 4 channels**, but only some sit over the intended targets — the rest
+land hundreds of km away in the swath (Gulf, Mexico, ocean; all points
+within lat 17–42, lon −133…−64). Channel-to-target distance is sharply
+**bimodal**: tasked channels ≤ ~18 km from a target GP, others ≥ ~400 km,
+with the 35–75 km band empty — so a 50 km cut cleanly separates them if
+target matching is ever wanted. At a 50 km cut, ~83% of commanded
+sat-seconds have ≥1 channel on target; the misses are actual-vs-predicted
+orbit drift. **The console draws all 4 channels unfiltered** (see the RawIF
+sweep note above).
+
+## Conventions established (fire-console UI)
+
+- Region palette blue (Southwest) / green (Southeast) / magenta (West Coast) —
+  validated colorblind-safe in light and dark themes.
+- Ember orange is reserved for "current day" chrome (playhead, active rings);
+  status red `--burn` is reserved for the burned classification. Neither is
+  ever used as a data-series color. Soil moisture has its own teal identity
+  (`--soil`) + a dry→wet sequential colormap (server-side, `soil_colormap`).
+  RawIF sweep dots are neutral ink (`--rawif`: near-black in light theme,
+  light cream in dark — a deliberate flip, identity carried by the legend +
+  HUD, never by color alone).
+- Server endpoints: `/api/version` (change fingerprint), `/api/bundle`
+  (full model incl. per-fire `[n_obs, n_burned]` day series + `soil` +
+  `rawif.days`), `/api/detections?day=&fire=` (compact lat/lon/y/u arrays,
+  mtime-cached), `/api/danger?day=&view=` and `/api/soil?day=&area=&bbox=&w=`
+  (raster PNGs), `/api/rawif?day=` (gzipped time-sorted t/lat/lon/s arrays + `sats` NORAD list).
+- The RawIF sweep is a `<canvas>` overlay pinned over the CONUS svg (same
+  960×590 viewBox space, pointer-events none), drawn with pre-rendered dot
+  sprites — SVG circles would choke at ~8k dots/frame.
