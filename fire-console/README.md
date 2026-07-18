@@ -64,7 +64,7 @@ automatically.
 | `GET /api/danger?day=YYYYMMDD&view=conus` | WFPI Day-1 danger raster as a transparent indexed PNG, warped into the console's Albers map space (rect published in the bundle's `danger.rect`) |
 | `GET /api/danger?day=YYYYMMDD&view=geo&bbox=lonMin,lonMax,latMin,latMax&w=600` | same raster over a plain lon/lat rectangle (used by the zoom insets) |
 | `GET /api/soil?day=YYYYMMDD&area=N&bbox=lonMin,lonMax,latMin,latMax&w=320` | soil-moisture retrieval for one fixed area warped into a lon/lat rectangle, as a transparent indexed PNG (dry→wet colormap) |
-| `GET /api/rawif?day=YYYYMMDD` | one day's RawIF track: time-sorted arrays `{t, lat, lon}` (t = UTC second of day) of all 4 channels' actual specular points at the planner's commanded RawIF seconds, unfiltered; served gzipped |
+| `GET /api/rawif?day=YYYYMMDD` | one day's RawIF track: time-sorted arrays `{t, lat, lon}` (t = UTC second of day) of all 4 channels' actual specular points at the planner's commanded RawIF seconds, unfiltered; plus a `storage` block — per-satellite storage-% breakpoints `lv[i] = {t, v}` simulated from the plan (+1/60 buffer per obs, −1/1200 per downlink second, clamped 0–100) and downlink windows `dnl = [[t0, t1, satIdx, stationIdx], …]` over `stations` (AUS/HI/CHI); served gzipped |
 | `GET /` , `GET /static/conus.json` | the page and the CONUS state outlines |
 
 Parsed CSVs are cached in memory keyed by file mtime, so the multi-MB files are
@@ -111,6 +111,17 @@ over each tasking box) shown in the roster, tooltips and detail view.
   ~170 MB CSV streamed once per day, cached gzipped by input mtimes
   (~1.2 s cold). Days with no plan+trajectory pair (2026-06-29, 07-10) say
   so in the HUD.
+- **Fleet ops strip** (shows with the RawIF sweep, under the CONUS map):
+  seven vertical storage bars — one per CYGNSS satellite — animate each
+  buffer filling as RawIF observations are taken (1/60 of the 60-image
+  buffer per obs) and draining during `DNL:` downlink windows (a full
+  buffer empties in 20 min), simulated per day from an empty buffer at
+  00:00 UTC. Three ground-station boxes (AUS · Australia, HI · Hawaii,
+  CHI · Chile) light ember and name the transmitting satellite(s) while a
+  downlink is in progress; the HUD shows "▼ downlink" at the same time.
+  Downlink windows are folded into the sweep's pass timeline (they mostly
+  fall between capture passes), so the scrub/prev/next controls traverse
+  them too.
 - Play / scrub the daily timeline (arrow keys, space).
 - Click any fire (roster, box, marker, Gantt row, trend point) for a detail
   view: enlarged footprint with per-day or cumulative detections and a

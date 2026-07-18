@@ -45,12 +45,25 @@ across day changes for the session). Added 2026-07-15: each satellite's
 newest visible dot carries a small **NORAD tag** (canvas text, halo'd in
 `--surface`; one tag per sat, not per channel). `/api/rawif?day=`
 joins the planner's per-satellite RawIF seconds to the actual 2 Hz
-trajectories (all 4 channels, first sample per sat-second, ~69k pts/day) and
+trajectories (all 4 channels, first sample per sat-second, ~4.2–4.6k
+pts/day — an earlier ~69k figure was stale) and
 serves gzipped time-sorted arrays — `t/lat/lon` plus per-point sat index `s`
 into `sats` (NORAD ids) — cached by input mtimes (~1.2 s cold; the
 fingerprint carries an extraction-version salt `_RAWIF_VER`, currently
-`sat-tags-v3` — bump it if the extraction logic changes, or stale browser
+`fleet-v1` — bump it if the extraction logic changes, or stale browser
 caches survive). Bundle `rawif.days` maps day → cache token.
+Added 2026-07-16: **fleet ops strip** under the CONUS map (shows/hides with
+the RawIF layer) — 7 per-satellite storage bars + 3 ground-station boxes
+(AUS/HI/CHI) that light ember and name the transmitting sat during `DNL:`
+windows. `/api/rawif` payload gained a `storage` block: per-sat
+piecewise-linear storage-% breakpoints (`lv[i]={t,v}`, simulated from the
+plan: +100/60 % per RawIF obs — 60-image buffer — and −100/1200 % per DNL
+second — 20 min full drain — clamped 0–100, buffer starts empty at 00:00
+UTC each day) and `dnl=[[t0,t1,satIdx,stationIdx],…]`. The client folds DNL
+windows into the sweep's pass segmentation (they mostly fall *between*
+capture passes, which the sweep would otherwise skip), roughly doubling the
+per-day loop (~45–50 s wall at 1×); the HUD appends "▼ downlink" while any
+window is active.
 
 ⚠️ **Deliberately unfiltered** (user decision 2026-07-15): all 4 channels are
 drawn, including specular points outside CONUS (Gulf, Mexico, ocean) — a
@@ -179,8 +192,15 @@ against the **predicted** orbits in `orbits/` (per-day access/specular/
 propagation folders per satellite), *not* the actual orbits.
 
 - `CYG<norad>_plan.csv`: two `#` comment lines, then `second_of_day, Command`
-  rows — `RawIF` (~2.4–2.8k s/sat/day) plus a few `DNL_*` downlink commands
-  (filter them out).
+  rows — `RawIF` (~130–210 s/sat/day, measured 2026-07-16; an earlier note
+  claiming 2.4–2.8k was stale) plus `DNL: <station>` downlink rows
+  (~2.5–3.9k s/sat/day, stations AUS/HI/CHI, ~10 contiguous windows/sat/day).
+  Storage rates used by the demo: one obs fills 100/60 % of the 60-image
+  buffer; one downlink second frees 100/1200 % (20 min empties a full
+  buffer). Simulated per day from empty, buffers hit 100 % and the planner
+  over-provisions downlink (drains clamp at 0 often). No same-second
+  obs∩dnl collisions; no station ever receives two sats at once in this
+  window.
 - `CYG<norad>_choices.txt`: `sec: [{'cmd': 'obs', 'targets': [gp, ...]}]` —
   the target **grid-point ids** each candidate second would observe (Python
   literal syntax; only `cmd == 'obs'` entries; every RawIF-commanded second

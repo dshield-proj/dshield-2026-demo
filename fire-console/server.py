@@ -837,9 +837,21 @@ def build_soil_info(dates):
 # CONUS map). All points fall within lat 17–42, lon −133…−64, so the map
 # projection needs no guard. Extraction streams the ~170 MB trajectory CSV
 # once (~1.5 s); results are cached gzipped by file mtimes.
+#
+# The plans also carry "DNL: <station>" rows — one per downlink second to a
+# ground station (AUS / HI / CHI). The payload's "storage" block simulates
+# each satellite's onboard buffer through the day (starts empty at 00:00
+# UTC): +100/60 % per RawIF observation (60-image buffer), −100/1200 % per
+# downlink second (20 min drains a full buffer), clamped to [0, 100]. It is
+# served as per-sat piecewise-linear breakpoints plus the downlink windows,
+# so the console can animate storage bars and light the station boxes on
+# the same sweep clock.
 
 _PLAN_RE = re.compile(r"^CYG(\d+)_plan\.csv$")
-_RAWIF_VER = "sat-tags-v3"   # salt: bump when the extraction logic changes
+_RAWIF_VER = "fleet-v1"      # salt: bump when the extraction logic changes
+_GS_ORDER = ("AUS", "HI", "CHI")
+_OBS_PCT = 100.0 / 60.0      # storage % filled per observation
+_DNL_PCT = 100.0 / 1200.0    # storage % freed per downlink second
 
 
 def orbit_csv_path(day):
@@ -878,25 +890,73 @@ def _rawif_token(fp):
 _rawif_cache = {}   # day -> (fp, gzipped payload bytes)
 
 
-def _load_plan_secs(plan_dir):
-    """norad str -> set of RawIF-commanded seconds, per CYG*_plan.csv."""
+def _load_plan_events(plan_dir):
+    """norad str -> {"obs": set(sec), "dnl": {sec: station}}, per CYG*_plan.csv."""
     plans = {}
     for name in sorted(os.listdir(plan_dir)):
         m = _PLAN_RE.match(name)
         if not m:
             continue
-        secs = set()
+        obs, dnl = set(), {}
         with open(os.path.join(plan_dir, name)) as fh:
             for line in fh:
                 parts = line.split(",")
-                if len(parts) == 2 and parts[1].strip() == "RawIF":
-                    try:
-                        secs.add(int(parts[0]))
-                    except ValueError:
-                        pass
-        if secs:
-            plans[m.group(1)] = secs
+                if len(parts) != 2:
+                    continue
+                try:
+                    sec = int(parts[0])
+                except ValueError:
+                    continue
+                cmd = parts[1].strip()
+                if cmd == "RawIF":
+                    obs.add(sec)
+                elif cmd.startswith("DNL:"):
+                    dnl[sec] = cmd[4:].strip()
+        if obs or dnl:
+            plans[m.group(1)] = {"obs": obs, "dnl": dnl}
     return plans
+
+
+def _storage_breakpoints(obs, dnl):
+    """Piecewise-linear storage-% breakpoints (t, v) over one day: an
+    observation steps +_OBS_PCT at its second, each downlink second drains
+    _DNL_PCT over that second, level clamped to [0, 100]. Collinear runs
+    (steady drains, per-second obs bursts) collapse to their endpoints."""
+    ts, vs = [0], [0.0]
+
+    def emit(t, v):
+        if len(ts) >= 2:
+            prev = (vs[-1] - vs[-2]) / (ts[-1] - ts[-2])
+            if abs((v - vs[-1]) / (t - ts[-1]) - prev) < 1e-9:
+                ts[-1] = t
+                vs[-1] = v
+                return
+        ts.append(t)
+        vs.append(v)
+
+    lv = 0.0
+    for s in sorted(obs | set(dnl)):
+        if ts[-1] < s:
+            emit(s, lv)              # hold flat through the idle stretch
+        if s in obs:
+            lv = min(100.0, lv + _OBS_PCT)
+        if s in dnl:
+            lv = max(0.0, lv - _DNL_PCT)
+        emit(s + 1, lv)
+    if ts[-1] < 86400:
+        emit(86400, lv)
+    return ts, [round(v, 2) for v in vs]
+
+
+def _dnl_windows(dnl):
+    """Contiguous same-station downlink runs as [start, end) windows."""
+    wins = []
+    for s in sorted(dnl):
+        if wins and s == wins[-1][1] and dnl[s] == wins[-1][2]:
+            wins[-1][1] = s + 1
+        else:
+            wins.append([s, s + 1, dnl[s]])
+    return wins
 
 
 def load_rawif(day):
@@ -910,7 +970,7 @@ def load_rawif(day):
             return hit[1]
     plan_dir = os.path.join(PLAN_ROOT, day)
     try:
-        plans = _load_plan_secs(plan_dir)
+        plans = _load_plan_events(plan_dir)
         sats = sorted(plans)            # NORAD ids, index = per-point sat tag
         sidx = {norad: i for i, norad in enumerate(sats)}
         pts = []
@@ -919,12 +979,12 @@ def load_rawif(day):
             fh.readline()               # header
             for line in fh:
                 c = line.split(",")
-                secs = plans.get(c[1])
-                if secs is None:
+                plan = plans.get(c[1])
+                if plan is None:
                     continue
                 f = c[2]                # "YYYY-MM-DD HH:MM:SS.frac" (fixed layout)
                 sec = int(f[11:13]) * 3600 + int(f[14:16]) * 60 + int(f[17:19])
-                if sec not in secs or (c[1], sec) in seen:
+                if sec not in plan["obs"] or (c[1], sec) in seen:
                     continue
                 seen.add((c[1], sec))
                 for k in (3, 6, 9, 12):
@@ -938,10 +998,24 @@ def load_rawif(day):
         print(f"[rawif] {day}: cannot build track: {e}", file=sys.stderr)
         return None
     pts.sort()
+    seen_gs = {st for p in plans.values() for st in p["dnl"].values()}
+    stations = [g for g in _GS_ORDER if g in seen_gs] + sorted(seen_gs - set(_GS_ORDER))
+    gidx = {g: i for i, g in enumerate(stations)}
+    lv, dnl_out = [], []
+    for i, norad in enumerate(sats):
+        p = plans[norad]
+        bt, bv = _storage_breakpoints(p["obs"], p["dnl"])
+        lv.append({"t": bt, "v": bv})
+        for w in _dnl_windows(p["dnl"]):
+            dnl_out.append([w[0], w[1], i, gidx[w[2]]])
+    dnl_out.sort()
     payload = {"day": day, "n": len(pts), "n_sats": len(plans), "sats": sats,
                "t": [p[0] for p in pts],
                "lat": [p[1] for p in pts], "lon": [p[2] for p in pts],
-               "s": [p[3] for p in pts]}
+               "s": [p[3] for p in pts],
+               "storage": {"limit": 60, "obs_pct": round(_OBS_PCT, 4),
+                           "dnl_pct": round(_DNL_PCT, 4),
+                           "stations": stations, "lv": lv, "dnl": dnl_out}}
     co = zlib.compressobj(6, zlib.DEFLATED, 31)   # gzip container
     gz = co.compress(json.dumps(payload, separators=(",", ":")).encode()) + co.flush()
     with _lock:

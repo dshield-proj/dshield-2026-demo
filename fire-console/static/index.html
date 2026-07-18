@@ -254,6 +254,43 @@ svg { display: block; width: 100%; height: auto; overflow: visible; }
 }
 .rawif-hud input[type="range"]:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
 .dot-legend .d-rawif { width: 8px; height: 8px; border-radius: 50%; background: var(--rawif); }
+
+/* ---------- fleet ops strip (storage + downlink) ---------- */
+.fleet {
+  display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: flex-end;
+  background: var(--panel-2); border: 1px solid var(--hair);
+  border-radius: 10px; padding: 9px 12px 10px;
+}
+.fleet-cap {
+  flex-basis: 100%; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+}
+.fleet-sats { display: flex; gap: 12px; flex-wrap: wrap; }
+.fs-sat { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.fs-bar {
+  width: 15px; height: 48px; position: relative; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--hair-2); border-radius: 4px;
+}
+.fs-bar i { position: absolute; bottom: 0; left: 0; right: 0; background: var(--rawif); opacity: 0.72; }
+.fs-sat.dl .fs-bar { border-color: var(--ember); box-shadow: 0 0 0 2px var(--ember-glow); }
+.fs-sat.dl .fs-bar i { background: var(--ember); opacity: 0.9; }
+.fs-id { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-2); }
+.fs-val { font-family: var(--font-mono); font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fs-sat.dl .fs-val { color: var(--ember); }
+.fleet-gs { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.gs-box {
+  min-width: 96px; padding: 6px 10px 7px; display: flex; flex-direction: column; gap: 1px;
+  background: var(--panel); border: 1px solid var(--hair-2); border-radius: 8px;
+  transition: border-color .12s, box-shadow .12s;
+}
+.gs-box.on { border-color: var(--ember); box-shadow: 0 0 0 3px var(--ember-glow); }
+.gs-code { font-family: var(--font-mono); font-size: 12.5px; font-weight: 640; letter-spacing: 0.05em; }
+.gs-box.on .gs-code { color: var(--ember); }
+.gs-site { font-size: 9.5px; color: var(--muted); }
+.gs-rx { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.gs-box.on .gs-rx { color: var(--ink); font-weight: 600; }
+@media (max-width: 560px) { .fleet-gs { margin-left: 0; } }
 .danger-legend {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
   margin: 0 2px; font-size: 11.5px; color: var(--ink-2);
@@ -676,7 +713,7 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
           <h1>CONUS active-fire watch &amp; burned-area detections</h1>
           <div class="sub">Five fires are prioritized daily for satellite tasking; dots are CYGNSS specular-point
             classifications inside each footprint. Window <span class="win">${fmt(B.dates[0])} → ${fmt(B.dates[N - 1])}</span>.
-            Data is read live from the local drive.${B.danger ? " Shaded backdrop: USGS WFPI Day-1 fire-danger forecast." : ""}${B.rawif ? " Black dots: commanded RawIF captures sweeping the day's actual specular tracks." : ""}</div>
+            Data is read live from the local drive.${B.danger ? " Shaded backdrop: USGS WFPI Day-1 fire-danger forecast." : ""}${B.rawif ? " Black dots: commanded RawIF captures sweeping the day's actual specular tracks; the fleet strip tracks each satellite's storage and ground-station downlinks." : ""}</div>
         </div>
         <div class="cmd-right">
           <button class="theme-btn" id="themebtn" type="button">theme: auto</button>
@@ -698,6 +735,12 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
             ${B.rawif ? `<canvas id="rawif-canvas" aria-hidden="true"></canvas>
             <div class="rawif-hud" id="rawif-hud" style="display:none" role="status" aria-live="off"><span id="rawif-ctl" style="display:none"><button id="rawif-prevp" type="button" title="previous pass" aria-label="Previous pass"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="3" height="16" rx="1"/><polygon points="20,4 8,12 20,20"/></svg></button><button id="rawif-back" type="button" title="back 15 min" aria-label="Rewind 15 minutes"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="11,4 1,12 11,20"/><polygon points="22,4 12,12 22,20"/></svg></button><button id="rawif-pause" type="button" aria-label="Pause sweep"></button><button id="rawif-fwd" type="button" title="forward 15 min" aria-label="Fast-forward 15 minutes"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="2,4 12,12 2,20"/><polygon points="13,4 23,12 13,20"/></svg></button><button id="rawif-nextp" type="button" title="next pass" aria-label="Next pass"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="4,4 16,12 4,20"/><rect x="17" y="4" width="3" height="16" rx="1"/></svg></button><input type="range" id="rawif-scrub" min="0" max="1000" step="1" value="0" aria-label="Sweep position within the day's passes"></span>RawIF <b id="rawif-time">--:--</b>Z · <span id="rawif-pass"></span><button class="spd" id="rawif-speed" type="button" style="display:none" title="playback speed" aria-label="Cycle playback speed">1×</button></div>` : ""}
           </div>
+          ${B.rawif ? `<div class="fleet" id="fleet" style="display:none" aria-label="Satellite storage levels and ground-station downlinks">
+            <div class="fleet-cap"><span>fleet ops — onboard storage &amp; downlink</span>
+            <span>bar = buffer fill (60 obs = full) · station lights while receiving</span></div>
+            <div class="fleet-sats" id="fleet-sats"></div>
+            <div class="fleet-gs" id="fleet-gs"></div>
+          </div>` : ""}
           <div class="insets">
             <div class="inset">
               <h4>Arizona / New Mexico <span class="cnt" id="az-cnt"></span></h4>
@@ -781,7 +824,7 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
       <div class="foot">
         <span class="live" id="live"><span class="ld"></span><span id="live-txt">live</span></span>
         <span id="foot-src"></span>
-        <span>boxes ≈ 0.5° × 0.6° · dots = CYGNSS specular points · dates are UTC production days${B.danger ? " · danger backdrop = WFPI Day-1 @ 1 km (USGS palette)" : ""}${B.rawif ? " · RawIF sweep = planned captures × actual specular tracks" : ""}</span>
+        <span>boxes ≈ 0.5° × 0.6° · dots = CYGNSS specular points · dates are UTC production days${B.danger ? " · danger backdrop = WFPI Day-1 @ 1 km (USGS palette)" : ""}${B.rawif ? " · RawIF sweep = planned captures × actual specular tracks · storage &amp; downlink simulated from command plans (obs = 1/60 buffer, full drain = 20 min)" : ""}</span>
       </div>`;
 
     ui = {};
@@ -1317,7 +1360,7 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
   const rawifCache = new Map();   // dday -> Promise<track|null>
   const rawif = { on: localStorage.getItem("fire-rawif-layer") !== "off", paused: false,
                   data: null, si: 0, tNow: 0, raf: 0, last: 0, seq: 0, spr: null,
-                  speed: 1, scrubbing: false };
+                  speed: 1, scrubbing: false, fleet: null };
 
   function prepRawif(d) {
     if (!d || !d.n) return null;
@@ -1327,11 +1370,23 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
       const p = ui.projC(d.lon[i], d.lat[i]);
       xs[i] = p[0]; ys[i] = p[1];
     }
-    const t = d.t, segs = [];
+    /* pass intervals: capture runs ∪ downlink windows — downlinks mostly sit
+       between capture passes, so they must be part of the played timeline or
+       the sweep clock would skip them and the fleet strip would never move */
+    const t = d.t, iv = [];
     let s0 = 0;
     for (let i = 1; i <= d.n; i++) {
-      if (i === d.n || t[i] - t[i - 1] > RW_GAP) { segs.push([t[s0], t[i - 1]]); s0 = i; }
+      if (i === d.n || t[i] - t[i - 1] > RW_GAP) { iv.push([t[s0], t[i - 1]]); s0 = i; }
     }
+    const sto = d.storage && d.storage.lv && d.storage.lv.length ? d.storage : null;
+    if (sto) sto.dnl.forEach((w) => iv.push([w[0], w[1]]));
+    iv.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const segs = [];
+    iv.forEach(([a, b]) => {
+      const last = segs[segs.length - 1];
+      if (last && a - last[1] <= RW_GAP) { if (b > last[1]) last[1] = b; }
+      else segs.push([a, b]);
+    });
     const hasTags = !!(d.sats && d.s);   // per-point satellite index (NORAD tag)
     /* scrub timeline: passes concatenated (lead + dwell + trail), gaps dropped */
     const off = new Float64Array(segs.length);
@@ -1340,7 +1395,7 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
       off[i] = total;
       total += RW_LEAD + (segs[i][1] - segs[i][0]) + RW_TRAIL;
     }
-    return { t, xs, ys, n: d.n, segs, off, total,
+    return { t, xs, ys, n: d.n, segs, off, total, storage: sto,
              sats: hasTags ? d.sats : null, ss: hasTags ? Uint8Array.from(d.s) : null };
   }
   const getRawif = (dday) => {
@@ -1358,6 +1413,74 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
     g.fillStyle = cssv("--rawif");
     g.beginPath(); g.arc(8, 8, 7, 0, 2 * Math.PI); g.fill();
     return c;
+  }
+
+  /* ---------- fleet ops strip — per-sat storage bars + ground-station boxes.
+     Driven by the same sweep clock: bars fill on RawIF captures (1/60 of the
+     buffer per obs) and drain during DNL windows (full buffer ≙ 20 min);
+     a station box lights ember while a satellite is downlinking to it. */
+  const GS_SITES = { AUS: "Australia", HI: "Hawaii", CHI: "Chile" };
+  function buildFleet(d) {
+    const holder = document.getElementById("fleet");
+    const satsEl = document.getElementById("fleet-sats");
+    const gsEl = document.getElementById("fleet-gs");
+    if (!holder || !d || !d.storage) { rawif.fleet = null; return; }
+    satsEl.textContent = ""; gsEl.textContent = "";
+    const fl = { cells: [], bars: [], vals: [], gs: [] };
+    d.sats.forEach((norad) => {
+      const cell = document.createElement("div");
+      cell.className = "fs-sat";
+      cell.title = "CYG" + norad + " onboard storage";
+      cell.innerHTML = `<div class="fs-bar"><i style="height:0%"></i></div>`
+        + `<span class="fs-id">${norad}</span><span class="fs-val">0%</span>`;
+      satsEl.appendChild(cell);
+      fl.cells.push(cell);
+      fl.bars.push(cell.querySelector("i"));
+      fl.vals.push(cell.querySelector(".fs-val"));
+    });
+    d.storage.stations.forEach((code) => {
+      const box = document.createElement("div");
+      box.className = "gs-box";
+      box.innerHTML = `<span class="gs-code">${esc(code)}</span>`
+        + `<span class="gs-site">${GS_SITES[code] || "ground station"}</span>`
+        + `<span class="gs-rx">idle</span>`;
+      gsEl.appendChild(box);
+      fl.gs.push({ box, rx: box.querySelector(".gs-rx") });
+    });
+    rawif.fleet = fl;
+  }
+  function storageAt(bp, t1) {   // interpolate a sat's breakpoint series
+    const t = bp.t, v = bp.v, n = t.length;
+    if (t1 <= t[0]) return v[0];
+    if (t1 >= t[n - 1]) return v[n - 1];
+    let lo = 0, hi = n - 1;
+    while (lo + 1 < hi) { const m = (lo + hi) >> 1; if (t[m] <= t1) lo = m; else hi = m; }
+    return v[lo] + (v[hi] - v[lo]) * (t1 - t[lo]) / (t[hi] - t[lo]);
+  }
+  function fleetRender(t1) {     // -> true while any downlink is active
+    const d = rawif.data, fl = rawif.fleet;
+    if (!d || !d.storage || !fl) return false;
+    const sto = d.storage;
+    const toGs = new Int8Array(fl.cells.length).fill(-1);   // sat -> station
+    const rx = fl.gs.map(() => []);                         // station -> sats
+    for (const w of sto.dnl) {
+      if (w[0] > t1) break;
+      if (t1 < w[1]) { toGs[w[2]] = w[3]; rx[w[3]].push("CYG" + d.sats[w[2]]); }
+    }
+    let any = false;
+    sto.lv.forEach((bp, i) => {
+      const v = storageAt(bp, t1);
+      fl.bars[i].style.height = v.toFixed(1) + "%";
+      fl.vals[i].textContent = Math.round(v) + "%";
+      fl.cells[i].classList.toggle("dl", toGs[i] >= 0);
+    });
+    fl.gs.forEach((g, gi) => {
+      const on = rx[gi].length > 0;
+      if (on) any = true;
+      g.box.classList.toggle("on", on);
+      g.rx.textContent = on ? "◂ " + rx[gi].join(" + ") : "idle";
+    });
+    return any;
   }
   function stopRawif() {
     if (rawif.raf) { cancelAnimationFrame(rawif.raf); rawif.raf = 0; }
@@ -1443,8 +1566,10 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
       }
     }
     g.globalAlpha = 1;
+    const linked = fleetRender(rawif.tNow);
     ui.rawifTime.textContent = rwClock(rawif.tNow);
     ui.rawifPass.textContent = "pass " + (rawif.si + 1) + "/" + d.segs.length
+      + (linked ? " · ▼ downlink" : "")
       + (rawif.paused ? " · paused" : "");
     if (ui.rawifScrub && !rawif.scrubbing) {
       ui.rawifScrub.value = String(Math.round(rawifU() / d.total * 1000));
@@ -1488,8 +1613,11 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
     const seq = ++rawif.seq;
     stopRawif();
     rawif.data = null;
+    rawif.fleet = null;
     rawif.scrubbing = false;
     const hud = ui.rawifHud;
+    const fleetEl = document.getElementById("fleet");
+    if (fleetEl) fleetEl.style.display = "none";
     if (ui.rawifCtl) ui.rawifCtl.style.display = "none";
     if (ui.rawifSpeed) ui.rawifSpeed.style.display = "none";
     if (!rawif.on) { hud.style.display = "none"; return; }
@@ -1514,6 +1642,8 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
       rawif.spr = rawifSprite();
       rawif.ink = cssv("--rawif");     // tag colors, re-read on theme rebuild
       rawif.halo = cssv("--surface");
+      buildFleet(d);
+      if (fleetEl && rawif.fleet) fleetEl.style.display = "";
       if (ui.rawifCtl) ui.rawifCtl.style.display = "";
       if (ui.rawifSpeed) ui.rawifSpeed.style.display = "";
       syncRawifPause();
