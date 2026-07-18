@@ -213,15 +213,17 @@ propagation folders per satellite), *not* the actual orbits.
 
 ### `daily_fire_perimeters/YYYYMMDD/<Fire>.geojson`
 
-NIFC WFIGS perimeters (fetched live 2026-07-15 from
-`WFIGS_Daily_Perimeters_Public`, matched by `irwin_id`) for the burned-area
-fires, dates **20260629 → 20260711**. Per date: latest record with
-`poly_DateCurrent` ≤ end of that UTC day; carried forward when stale
-(`properties.carried_forward`/`days_stale`; `manifest.csv` indexes all
-date × fire statuses). ⚠️ Rookery has **no polygon in any NIFC service** —
-only `Rookery_incident_point.geojson`; White_Tail's single perimeter starts
-07-02; Shell's is ~30 days stale (contained in May). Don't trust
-`poly_PolygonDateTime` (nulls + 2027 year typos) — see the folder README.
+NIFC WFIGS perimeters (re-fetched live 2026-07-17 from
+`WFIGS_Daily_Perimeters_Public`, matched by `irwin_id`; the 2026-07-15 fetch
+had been deleted) for all 8 burned-area fires, dates **20260629 → 20260710**.
+Regenerate with `helper_scripts/fetch_fire_perimeters.py` (stdlib-only).
+Per date: latest record with `poly_DateCurrent` ≤ end of that UTC day;
+carried forward when stale (`properties.carried_forward`/`days_stale`;
+`manifest.csv` indexes all date × fire statuses). ⚠️ Rookery has **no polygon
+in any NIFC service** — only `Rookery_incident_point.geojson`; White_Tail's
+single perimeter starts 07-02; Avocado's starts 07-08; Shell's is ~20–31 days
+stale (contained, last record 06-09). Don't trust `poly_PolygonDateTime`
+(nulls + year typos) — see the folder README.
 
 ### `orbits_actual/specular_trajectory_YYYY-MM-DD.csv`
 
