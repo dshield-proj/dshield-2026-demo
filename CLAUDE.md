@@ -1,6 +1,6 @@
 # demo_analysis — DShield 2026 fire demo
 
-Working notes for this folder. Work done July 13–15, 2026 (Claude-assisted):
+Working notes for this folder. Work done July 13–17, 2026 (Claude-assisted):
 analysis and visualization of the burned-area tasking campaign, plus the
 fire-danger (WFPI Day-1), soil-moisture, and RawIF-sweep (planner ×
 orbits_actual) layers. `orbits/` holds the **predicted** orbits the plan was
@@ -8,7 +8,8 @@ built on; `orbits_actual/` holds the **actual** orbits. The console uses
 `planner/output`'s `*_plan.csv` + `orbits_actual/`; `*_choices.txt`,
 `orbits/Grid.csv`, and the TV files are analyzed and documented below but not
 used by the console; solver internals and the per-satellite `orbits/output`
-access/specular predictions are unanalyzed.
+access predictions are unanalyzed (the specular predictions are analyzed —
+see the PPT-animation section below).
 
 ## What was built
 
@@ -67,6 +68,43 @@ itself is kept; it is just not wired into the console.
 
 An earlier **static snapshot** (data embedded, no server) is published as a
 claude.ai artifact: https://claude.ai/code/artifact/0a122e8b-5fd7-4945-9938-7d2b09b34f90
+
+### `helper_scripts/rawif_pred_vs_actual_anim.py` — PPT animation (2026-07-17, reworked 2026-07-18)
+
+Per-day MP4 (or `--gif`) for PowerPoint comparing **predicted vs actual**
+specular points at the planner-commanded RawIF seconds, in a **lat/lon
+bounded region** — default the Pocket fire box + 0.4° pad (`--fire` picks
+another watchlist fire, `--bbox LATMIN LATMAX LONMIN LONMAX` is explicit).
+Map draws *all* predicted points (every visible transmitter) as filled blue
+dots, actual top-4 points as filled green dots, and a connector line per
+matched pair, over fire watchlist boxes + graticule + km scale bar; side
+panels: actual−predicted offset "dartboard" in km + offset-vs-UTC strip;
+recent bright, history faint, idle gaps skipped, pacing auto-slowed for
+sparse regions (`--rate` = data-s per video s). ⚠️ Offsets (~1–4 km) are
+sub-pixel at region scale, so matched green dots sit exactly on their blue
+partners — `--exaggerate N` stretches actual dots N× from their partner on
+the map (annotated on-figure; dartboard/strip stay true). `--map` writes a
+single high-quality full-day PNG instead — just the region map + points
+with larger slide-ready type (figure sized to region aspect, 200 dpi
+default). Needs
+numpy/matplotlib/imageio-ffmpeg (pip-installed 2026-07-17; NOT stdlib-only
+like the console). `--preview` writes 3 stills; outputs land in
+`helper_scripts/output/` (untracked) with a poster PNG. Pairs are matched by
+GPS transmitter per (sat, second) — prediction lists all visible
+transmitters, actual only the top-4 by signal strength, so matching is done
+from the actual side (100 % matched on 20260702; a point just outside the
+region is kept when its partner is inside).
+
+Predicted specular format (`orbits/output/YYYYMMDD/CYG<norad>/specular/
+specular.csv`, ~47 MB/sat/day): 5 header lines then
+`time index,source id,lat [deg],lon [deg],rank` — time index = second-of-day
+0…86400, `source id` = `GNSS<gps-norad>` (matches `norad_chN` in
+`orbits_actual`), **lon is 0–360** (normalize!), `rank` is always empty, rows
+are **grouped by transmitter, not time-sorted** (never early-break a scan).
+Measured 2026-07-02: offsets median 1.4 km / max 3.8 km — early-day passes sit
+~1.3 km east of prediction, the late-day passes (after the day's 14 h idle
+stretch) ~2–3.5 km west, i.e. drift grows with propagation age. Actual
+trajectories can have **empty channel fields** (~300/day) — guard the parse.
 
 ## Data layout and facts
 

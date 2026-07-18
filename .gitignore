@@ -19,3 +19,4 @@ planner/*
 dshield-demo-configuration/*
 dshield-demo-bucket/*
 orbits_actual/*
+helper_scripts/output/*
