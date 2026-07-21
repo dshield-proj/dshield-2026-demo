@@ -64,6 +64,14 @@ windows into the sweep's pass segmentation (they mostly fall *between*
 capture passes, which the sweep would otherwise skip), roughly doubling the
 per-day loop (~45–50 s wall at 1×); the HUD appends "▼ downlink" while any
 window is active.
+Added 2026-07-21: collapsible **workflow banner** between the header and the
+map — one-line pipeline summary + hand-rolled SVG of the demo's module flow
+(from `Presentation1.pdf`: CYGNSS L1 + active-fire priority → burned-area /
+soil-moisture → fire danger → planner, with orbits feeding in; WRF-SFIRE and
+next-day commands as dashed "ghost" nodes). Nodes tooltip their role /
+deployment site / daily UTC slot and click-jump to the console view showing
+their product (danger & planner nodes also switch the map layer on).
+Open/closed persists in `localStorage["fire-workflow"]` (default open).
 
 ⚠️ **Deliberately unfiltered** (user decision 2026-07-15): all 4 channels are
 drawn, including specular points outside CONUS (Gulf, Mexico, ocean) — a

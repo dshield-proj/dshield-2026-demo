@@ -155,6 +155,45 @@ h1 {
 .theme-btn:hover { border-color: var(--muted); }
 .theme-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
 
+/* ---------- workflow banner ---------- */
+.wfcard { margin-bottom: 16px; }
+.wf-head {
+  display: flex; align-items: baseline; gap: 12px; width: 100%;
+  background: none; border: none; cursor: pointer; text-align: left;
+  padding: 12px 16px; color: inherit; font: inherit; border-radius: 14px;
+}
+.wf-head:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
+.wf-chev {
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+  flex: none; display: inline-block; transition: transform .15s;
+}
+.wf-head[aria-expanded="true"] .wf-chev { transform: rotate(90deg); }
+.wf-ttl {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted); flex: none;
+}
+.wf-sum { font-size: 12.5px; color: var(--ink-2); min-width: 0; }
+.wf-body { padding: 2px 16px 14px; }
+.wf-note {
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 18px;
+  margin-top: 8px; font-size: 11.5px; color: var(--muted);
+}
+.wf-meta { font-family: var(--font-mono); font-size: 10.5px; }
+#wf-svg { min-width: 820px; }
+.wf-box { fill: var(--panel); stroke: var(--hair-2); }
+.wf-node { cursor: pointer; }
+.wf-node:hover .wf-box { stroke: var(--muted); }
+.wf-node:focus-visible { outline: none; }
+.wf-node:focus-visible .wf-box { stroke: var(--ember); stroke-width: 1.5; }
+.wf-idle { cursor: default; }
+.wf-ghost .wf-box { fill: none; stroke-dasharray: 4 3; }
+.wf-t { font-size: 12.5px; font-weight: 600; fill: var(--ink); text-anchor: middle; }
+.wf-ghost .wf-t { fill: var(--ink-2); }
+.wf-s { font-family: var(--font-mono); font-size: 9px; fill: var(--muted); text-anchor: middle; }
+.wf-line { fill: none; stroke: var(--hair-2); stroke-width: 1.3; }
+.wf-arrhead { fill: var(--muted); }
+.wf-flash { outline: 2px solid transparent; outline-offset: 3px; }
+
 /* ---------- stage ---------- */
 .stage {
   display: grid; grid-template-columns: minmax(0,1.62fr) minmax(240px,0.9fr);
@@ -564,6 +603,11 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
   .marker .halo { transform-box: fill-box; transform-origin: center; }
   .live .ld { animation: blink 2.4s ease-in-out infinite; }
   @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .wf-flash { animation: wfflash 1.4s ease-out; }
+  @keyframes wfflash {
+    0%, 55% { outline-color: var(--ember); }
+    100%    { outline-color: transparent; }
+  }
 }
 </style>
 </head>
@@ -705,6 +749,7 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
   /* ================= build ================= */
   function buildAll() {
     const N = B.dates.length;
+    const wfOpen = localStorage.getItem("fire-workflow") !== "closed";
     const app = document.getElementById("app");
     app.innerHTML = `
       <header class="cmd">
@@ -720,6 +765,22 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
           <div class="stats" id="stats"></div>
         </div>
       </header>
+      <section class="card wfcard">
+        <button class="wf-head" id="wf-toggle" type="button" aria-expanded="${wfOpen}" aria-controls="wf-body">
+          <span class="wf-chev" aria-hidden="true">▸</span>
+          <span class="wf-ttl">Workflow</span>
+          <span class="wf-sum">Observe → process → predict → task, repeated daily: CYGNSS L1 measurements become
+            burned-area and soil-moisture products, fold into fire-danger forecasts, and drive next-day RawIF
+            tasking of the 7-satellite constellation — commands are generated, never uplinked.</span>
+        </button>
+        <div class="wf-body" id="wf-body"${wfOpen ? "" : " hidden"}>
+          <div class="chart-scroll"><svg id="wf-svg" viewBox="0 0 960 192" role="group" aria-label="Workflow diagram: CYGNSS L1 data and the daily active-fire priority feed burned-area, soil-moisture and fire-danger processing, which together with predicted orbits feed the planner that generates next-day satellite commands."></svg></div>
+          <div class="wf-note">
+            <span>hover a module for details · click one to jump to its console view</span>
+            <span class="wf-meta">NASA ESTO 12-day brassboard · modules distributed across sites · products exchanged on Cloudflare R2</span>
+          </div>
+        </div>
+      </section>
       <div class="stage">
         <section class="card mapcard">
           <div class="map-head">
@@ -841,6 +902,15 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
       else { delete document.documentElement.dataset.theme; localStorage.removeItem("fire-theme"); }
       tbtn.textContent = themeLbl();
       buildAll(); setDay(cur);
+    };
+
+    /* workflow banner toggle */
+    const wfBtn = document.getElementById("wf-toggle");
+    wfBtn.onclick = () => {
+      const open = wfBtn.getAttribute("aria-expanded") !== "true";
+      wfBtn.setAttribute("aria-expanded", String(open));
+      document.getElementById("wf-body").hidden = !open;
+      localStorage.setItem("fire-workflow", open ? "open" : "closed");
     };
 
     /* stats */
@@ -1078,6 +1148,90 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
     buildTrend();
     buildGantt();
     if (B.soil) buildSoil();
+    buildWorkflow();
+  }
+
+  /* ---------- workflow banner ----------
+     Static diagram of the demo pipeline (per the ESTO demonstration deck).
+     Each module node tooltips its role / where it ran / daily UTC slot, and
+     clicking jumps to (and, for map layers, switches on) the console view
+     that shows its product. Ghost nodes are context only. */
+  function buildWorkflow() {
+    const svg = document.getElementById("wf-svg");
+    if (!svg) return;
+    const flash = (t) => { t.classList.remove("wf-flash"); void t.offsetWidth; t.classList.add("wf-flash"); };
+    const jump = (sel) => {
+      const t = document.querySelector(sel);
+      if (t) { t.scrollIntoView({ behavior: "smooth", block: "center" }); flash(t); }
+    };
+    const layerJump = (btnId) => {
+      const b = document.getElementById(btnId);
+      if (b && b.getAttribute("aria-pressed") !== "true") b.click();
+      jump(".mapcard");
+    };
+
+    const defs = el("defs");
+    const mk = el("marker", { id: "wf-arr", viewBox: "0 0 8 8", refX: 7, refY: 4, markerWidth: 7, markerHeight: 7, orient: "auto" });
+    mk.appendChild(el("path", { d: "M0 0L8 4L0 8Z", class: "wf-arrhead" }));
+    defs.appendChild(mk);
+    svg.appendChild(defs);
+
+    const gE = el("g");
+    ["M146 84 H185",             // L1 → burned area
+     "M77 64 V30 H185",          // L1 → soil moisture
+     "M146 152 H230 V109",       // priority → burned area
+     "M77 172 V182 H660 V109",   // priority → planner
+     "M328 84 H377",             // burned area → fire danger
+     "M328 30 H420 V59",         // soil moisture → fire danger
+     "M300 104 V152 H377",       // burned area → WRF-SFIRE
+     "M520 84 H569",             // fire danger → planner
+     "M643 50 V59",              // orbits → planner
+     "M712 84 H755",             // planner → commands
+    ].forEach((d) => gE.appendChild(el("path", { d, class: "wf-line", "marker-end": "url(#wf-arr)" })));
+    svg.appendChild(gE);
+
+    const nodes = [
+      { x: 8, y: 64, t: "CYGNSS L1 data", s: "input · 2–5 day latency", ghost: true,
+        tip: ["GNSS-R measurements from the 7-satellite constellation", "everything downstream starts here"] },
+      { x: 8, y: 132, t: "Active-fire priority", s: "NIFC top-5 daily", act: () => jump(".ganttcard"),
+        tip: ["ranks NIFC fire perimeters by size — the day's 5-fire tasking watchlist", "runs 00 UTC daily", "console: tasking boxes · roster · Gantt"] },
+      { x: 190, y: 10, t: "Soil moisture", s: "NM + TX panhandle", act: B.soil ? () => jump(".soilcard") : null,
+        tip: ["retrievals at two fixed monitoring areas", "USC workstation · 00–14 UTC", "console: soil-moisture card"] },
+      { x: 190, y: 64, t: "Burned area", s: "top-5 fire boxes", act: () => jump(".trendcard"),
+        tip: ["classifies specular points in the watchlist boxes as burned / unburned", "USC workstation · 00–14 UTC", "console: detection dots · burn-fraction trend"] },
+      { x: 382, y: 64, t: "Fire danger", s: "WFPI · pre-fire priority", act: B.danger ? () => layerJump("dangerbtn") : null,
+        tip: ["7-day fire-danger forecast; the day-2 lead sets the pre-fire priority", "USGS workstation · 19 UTC", "console: WFPI Day-1 backdrop"] },
+      { x: 382, y: 132, t: "WRF-SFIRE", s: "post-period analysis", ghost: true,
+        tip: ["burned-area detections feed fire-arrival-time + spread simulations", "run after the 12-day window — not in this console"] },
+      { x: 574, y: 10, t: "Orbits", s: "next-day prediction", act: B.rawif ? () => layerJump("rawifbtn") : null,
+        tip: ["next-day orbit forecast for all 7 satellites", "AWS NASA Science Cloud · 14 UTC", "console: the sweep shows the as-flown tracks"] },
+      { x: 574, y: 64, t: "Planner", s: "RawIF + downlink", act: B.rawif ? () => layerJump("rawifbtn") : null,
+        tip: ["optimizes next-day RawIF captures + ground-station downlinks per satellite", "local machine · 17 UTC", "console: RawIF sweep · fleet ops strip"] },
+      { x: 760, y: 64, w: 192, t: "Next-day commands", s: "7 sats · never uplinked", ghost: true,
+        act: B.rawif ? () => layerJump("rawifbtn") : null,
+        tip: ["per-satellite command schedules for the next UTC day", "brassboard demo — nothing is sent to the real constellation", "console: the RawIF sweep animates them"] },
+    ];
+    nodes.forEach((n) => {
+      const w = n.w || 138, h = 40;
+      const g = el("g", { class: "wf-node" + (n.ghost ? " wf-ghost" : "") + (n.act ? "" : " wf-idle") });
+      g.setAttribute("aria-label", n.t + " — " + n.tip[0]);
+      if (n.act) { g.setAttribute("tabindex", 0); g.setAttribute("role", "button"); }
+      g.appendChild(el("rect", { x: n.x, y: n.y, width: w, height: h, rx: 9, class: "wf-box" }));
+      const t1 = el("text", { x: n.x + w / 2, y: n.y + 17, class: "wf-t" }); t1.textContent = n.t;
+      const t2 = el("text", { x: n.x + w / 2, y: n.y + 31, class: "wf-s" }); t2.textContent = n.s;
+      g.appendChild(t1); g.appendChild(t2);
+      g.addEventListener("mousemove", (e) => showTip(
+        `<div class="tt-nm">${n.t}</div>` + n.tip.map((r) => `<div class="tt-row">${r}</div>`).join(""),
+        e.clientX, e.clientY));
+      g.addEventListener("mouseleave", hideTip);
+      if (n.act) {
+        g.addEventListener("click", () => { hideTip(); n.act(); });
+        g.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hideTip(); n.act(); }
+        });
+      }
+      svg.appendChild(g);
+    });
   }
 
   /* ---------- soil moisture ---------- */

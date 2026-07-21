@@ -82,6 +82,13 @@ over each tasking box) shown in the roster, tooltips and detail view.
 
 ## Page features
 
+- Collapsible **workflow banner** at the top: a one-line summary of the demo
+  pipeline (observe → process → predict → task) plus an SVG module-flow
+  diagram from the demonstration deck. Hovering a module shows its role,
+  deployment site and daily UTC slot; clicking jumps to the console view that
+  shows its product (the fire-danger and planner/orbits nodes also switch on
+  the corresponding map layer). The open/closed state is remembered per
+  browser.
 - Albers CONUS map with the day's tasking footprints; Arizona/New Mexico and
   Florida zoom insets show each footprint with its CYGNSS specular-point
   detections (filled = classified burned, hollow = unburned, opacity =
