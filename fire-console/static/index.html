@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Burned-Area Tasking Console — CONUS Fire Watch</title>
+<title>DSHIELD wildfire sensing pipeline console</title>
 <style>
 :root {
   --page:      #ece7dc;
@@ -754,8 +754,8 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
     app.innerHTML = `
       <header class="cmd">
         <div class="brand">
-          <div class="eyebrow"><span class="dot"></span> DShield · Burned-Area Tasking</div>
-          <h1>CONUS active-fire watch &amp; burned-area detections</h1>
+          <div class="eyebrow"><span class="dot"></span> DShield · Wildfire monitoring</div>
+          <h1>DSHIELD wildfire sensing pipeline console</h1>
           <div class="sub">Five fires are prioritized daily for satellite tasking; dots are CYGNSS specular-point
             classifications inside each footprint. Window <span class="win">${fmt(B.dates[0])} → ${fmt(B.dates[N - 1])}</span>.
             Data is read live from the local drive.${B.danger ? " Shaded backdrop: USGS WFPI Day-1 fire-danger forecast." : ""}${B.rawif ? " Black dots: commanded RawIF captures sweeping the day's actual specular tracks; the fleet strip tracks each satellite's storage and ground-station downlinks." : ""}</div>
@@ -1181,7 +1181,6 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
      "M77 64 V30 H185",          // L1 → soil moisture
      "M146 152 H230 V109",       // priority → burned area
      "M77 172 V182 H660 V109",   // priority → planner
-     "M328 84 H377",             // burned area → fire danger
      "M328 30 H420 V59",         // soil moisture → fire danger
      "M300 104 V152 H377",       // burned area → WRF-SFIRE
      "M520 84 H569",             // fire danger → planner

@@ -73,6 +73,14 @@ deployment site / daily UTC slot and click-jump to the console view showing
 their product (danger & planner nodes also switch the map layer on).
 Open/closed persists in `localStorage["fire-workflow"]` (default open).
 
+⚠️ A **WFPI Day-1 backdrop on the soil-site thumbnails** (danger raster under
+the retrieval pixels via the existing `/api/danger?view=geo` warp at the soil
+bbox, tied to the danger-layer toggle) was built 2026-07-21 and **reverted on
+request** the same day — do not re-add it unless asked. If it ever comes
+back: the rasters share the 1 km LAEA grid so bbox alignment is exact, but
+mute the backdrop to ~0.5 opacity — at the map's 0.66 the soil dots drown in
+NM's red danger bins (verified with server-side composites).
+
 ⚠️ **Deliberately unfiltered** (user decision 2026-07-15): all 4 channels are
 drawn, including specular points outside CONUS (Gulf, Mexico, ocean) — a
 commanded second captures the whole receiver, and the user wants the
