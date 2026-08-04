@@ -22,7 +22,12 @@ several earlier figures.
 Interactive fire-watch console served by a **stdlib-only Python server** that
 reads the data below live from disk (nothing baked into the HTML). Run
 `python3 fire-console/server.py` → http://localhost:8000; view from a laptop
-via SSH port forwarding (see `fire-console/README.md`). Features: Albers CONUS
+via SSH port forwarding (see `fire-console/README.md`). Optional `--from` /
+`--to` flags (added 2026-08-04; YYYY-MM-DD or YYYYMMDD, inclusive) clamp the
+served day window — e.g.
+`python3 fire-console/server.py --from 2026-06-30 --to 2026-07-10` — filtering
+the config/soil/RawIF day lists via `_in_window`, so every layer follows;
+default is all days on disk. Features: Albers CONUS
 map with daily tasking footprints, AZ/NM + FL zoom insets with CYGNSS detection
 dots (filled red = burned, hollow = unburned, opacity = classifier confidence),
 play/scrub timeline, per-fire detail overlay with day/cumulative modes,

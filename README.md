@@ -19,11 +19,14 @@ ground-station downlinks.
 
 ```bash
 python3 fire-console/server.py     # → http://localhost:8000
+python3 fire-console/server.py --from 2026-06-30 --to 2026-07-10   # serve only that day window
 ```
 
 It reads the sibling data folders (`dshield-demo-configuration/`,
 `burned-area/`, `fire-danger/`, `soil-moisture/`, `planner/`,
 `orbits-actual/`) live — new day folders appear on the page within ~5 s.
+The optional `--from` / `--to` flags (YYYY-MM-DD or YYYYMMDD, inclusive)
+limit the served day window; by default every day on disk is served.
 
 If the server runs on a remote machine (e.g. EC2), forward the port and
 browse from your laptop:
@@ -38,6 +41,39 @@ forward port 8000 from the **Ports** panel.
 See [fire-console/README.md](fire-console/README.md) for configuration
 (ports, data paths, optional auth token), the JSON API, and the full feature
 list.
+
+## Helper scripts
+
+Standalone utilities in `helper_scripts/`, run directly with
+`python3 helper_scripts/<script>.py`:
+
+- **`rawif_pred_vs_actual_anim.py`** — renders a per-day MP4 (or `--gif`)
+  for PowerPoint comparing **predicted vs actual** specular points at the
+  planner-commanded RawIF seconds, within a lat/lon region (default: the
+  Pocket fire box; `--fire` picks another watchlist fire, `--bbox` is
+  explicit). Predicted points draw blue, actual points green, with a
+  connector per matched pair over the fire watchlist boxes; side panels show
+  the actual−predicted offset dartboard (km) and offset vs UTC.
+  `--map` writes a single slide-ready full-day PNG instead, `--preview`
+  writes 3 stills, and `--exaggerate N` stretches the (sub-pixel, ~1–4 km)
+  offsets for visibility. Outputs land in `helper_scripts/output/`
+  (untracked). ⚠️ Unlike the console, this needs
+  numpy / matplotlib / imageio-ffmpeg (`pip install`), not just the stdlib.
+- **`fetch_fire_perimeters.py`** — rebuilds `daily_fire_perimeters/` from
+  the live NIFC WFIGS services (stdlib-only): for each fire in the
+  burned-area configs and each date in the analysis window, fetches the
+  latest perimeter by IRWIN id, carrying stale perimeters forward
+  (tagged `carried_forward` / `days_stale`) and falling back to the WFIGS
+  incident point for fires with no polygon (Rookery). Writes a
+  `manifest.csv` indexing all date × fire statuses.
+- **`generate_configs.py`** — regenerates the daily demo config JSONs under
+  `dshield-demo-configuration/`: the master
+  `dshield-demo-config-YYYYMMDD.json`, per-day
+  `soil-moisture-config/YYYYMMDD/sm_areas.json`, and
+  `planner_config/planner-config-YYYYMMDD.json`. Edit the parameters at the
+  top of the script (start date, day count, CYGNSS latency, forecast
+  horizons) and run; note that orbits/planner outputs are dated one day
+  ahead of the config day.
 
 ## Setup for syncing local data to the remote buckets
 

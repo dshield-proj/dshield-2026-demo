@@ -10,6 +10,7 @@ Stdlib only — no dependencies.
 
 Usage:
     python3 server.py                    # http://localhost:8000
+    python3 server.py --from 2026-06-30 --to 2026-07-10   # serve only that day window
     PORT=8080 python3 server.py
     FIRE_TOKEN=mysecret python3 server.py   # require ?token=mysecret (for tunnels)
 
@@ -22,8 +23,10 @@ Environment:
     FIRE_PLAN_ROOT    RawIF plan CSVs (default: ../planner/output)
     FIRE_ORBIT_ROOT   specular trajectories (default: ../orbits-actual)
 """
+import argparse
 import array
 import csv
+import datetime
 import hashlib
 import json
 import math
@@ -55,6 +58,12 @@ TOKEN = os.environ.get("FIRE_TOKEN", "")
 PORT = int(os.environ.get("PORT", "8000"))
 
 DAY_RE = re.compile(r"^\d{8}$")
+DAY_FROM = None  # inclusive YYYYMMDD window bounds, set by --from/--to
+DAY_TO = None
+
+
+def _in_window(day):
+    return (DAY_FROM is None or day >= DAY_FROM) and (DAY_TO is None or day <= DAY_TO)
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/static/conus.json": ("conus.json", "application/json"),
@@ -503,7 +512,7 @@ def soil_mtime(day, area_id):
 
 def list_soil_days():
     try:
-        entries = sorted(e for e in os.listdir(SOIL_ROOT) if DAY_RE.match(e))
+        entries = sorted(e for e in os.listdir(SOIL_ROOT) if DAY_RE.match(e) and _in_window(e))
     except OSError:
         return []
     out = []
@@ -879,7 +888,7 @@ def _rawif_fp(day):
 
 def list_rawif_days():
     try:
-        entries = sorted(e for e in os.listdir(PLAN_ROOT) if DAY_RE.match(e))
+        entries = sorted(e for e in os.listdir(PLAN_ROOT) if DAY_RE.match(e) and _in_window(e))
     except OSError:
         return []
     return [d for d in entries if _rawif_fp(d) is not None]
@@ -1038,7 +1047,7 @@ def rawif_bundle_info():
 
 def list_days():
     try:
-        entries = sorted(e for e in os.listdir(CONFIG_ROOT) if DAY_RE.match(e))
+        entries = sorted(e for e in os.listdir(CONFIG_ROOT) if DAY_RE.match(e) and _in_window(e))
     except OSError:
         return []
     return [d for d in entries if os.path.isfile(os.path.join(CONFIG_ROOT, d, "fires.json"))]
@@ -1318,8 +1327,32 @@ def warmup():
 
 
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser(
+        description="DShield fire-watch console server (data paths/port/token via "
+                    "environment variables — see the module docstring).")
+    ap.add_argument("--from", dest="day_from", metavar="DATE",
+                    help="first demo day to serve, YYYY-MM-DD or YYYYMMDD (default: all on disk)")
+    ap.add_argument("--to", dest="day_to", metavar="DATE",
+                    help="last demo day to serve, inclusive (default: all on disk)")
+    args = ap.parse_args()
+
+    def _day_arg(s):
+        if s is None:
+            return None
+        d = s.replace("-", "")
+        try:
+            datetime.datetime.strptime(d, "%Y%m%d")
+        except ValueError:
+            ap.error(f"bad date {s!r} — use YYYY-MM-DD or YYYYMMDD")
+        return d
+
+    DAY_FROM, DAY_TO = _day_arg(args.day_from), _day_arg(args.day_to)
+    if DAY_FROM and DAY_TO and DAY_FROM > DAY_TO:
+        ap.error(f"--from {args.day_from} is after --to {args.day_to}")
     print(f"config root: {CONFIG_ROOT}")
     print(f"detect root: {DETECT_ROOT}")
+    if DAY_FROM or DAY_TO:
+        print(f"day window : {DAY_FROM or 'first'} → {DAY_TO or 'last'}")
     print(f"auth token : {'ON' if TOKEN else 'off (localhost use)'}")
     threading.Thread(target=warmup, daemon=True).start()
     srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)

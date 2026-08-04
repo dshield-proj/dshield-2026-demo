@@ -11,9 +11,14 @@ timeline grows within ~5 seconds; delete one and it shrinks.
 ```bash
 cd fire-console
 python3 server.py            # → http://localhost:8000
+python3 server.py --from 2026-06-30 --to 2026-07-10   # serve only that day window
 ```
 
-No dependencies. Options via environment variables:
+No dependencies. The optional `--from` / `--to` flags (YYYY-MM-DD or
+YYYYMMDD, inclusive) limit which day folders are served — days outside the
+window are ignored everywhere (watchlist timeline, danger, soil moisture,
+RawIF); by default every day found on disk is served. Other options via
+environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
