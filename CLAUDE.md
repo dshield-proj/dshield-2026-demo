@@ -10,7 +10,10 @@ built on; `orbits-actual/` holds the **actual** orbits. The console uses
 `orbits/Grid.csv`, and the TV files are analyzed and documented below but not
 used by the console; solver internals and the per-satellite `orbits/output`
 access predictions are unanalyzed (the specular predictions are analyzed —
-see the PPT-animation section below).
+see the PPT-animation section below). All data facts below were re-verified
+against the on-disk data 2026-08-04 — after the 2026-07-17 orbits-actual
+extension and the 2026-07-21 burned-area refresh, which had invalidated
+several earlier figures.
 
 ## What was built
 
@@ -46,8 +49,8 @@ across day changes for the session). Added 2026-07-15: each satellite's
 newest visible dot carries a small **NORAD tag** (canvas text, halo'd in
 `--surface`; one tag per sat, not per channel). `/api/rawif?day=`
 joins the planner's per-satellite RawIF seconds to the actual 2 Hz
-trajectories (all 4 channels, first sample per sat-second, ~4.2–4.6k
-pts/day — an earlier ~69k figure was stale) and
+trajectories (all 4 channels, first sample per sat-second, ~3.9–4.6k
+pts/day measured 2026-08-04 — an earlier ~69k figure was stale) and
 serves gzipped time-sorted arrays — `t/lat/lon` plus per-point sat index `s`
 into `sats` (NORAD ids) — cached by input mtimes (~1.2 s cold; the
 fingerprint carries an extraction-version salt `_RAWIF_VER`, currently
@@ -134,7 +137,9 @@ are **grouped by transmitter, not time-sorted** (never early-break a scan).
 Measured 2026-07-02: offsets median 1.4 km / max 3.8 km — early-day passes sit
 ~1.3 km east of prediction, the late-day passes (after the day's 14 h idle
 stretch) ~2–3.5 km west, i.e. drift grows with propagation age. Actual
-trajectories can have **empty channel fields** (~300/day) — guard the parse.
+trajectories have **empty channel fields** — ~22 % of rows (~270k/day) are
+missing at least one channel (an earlier "~300/day" figure counted only the
+channel samples lost at the commanded RawIF seconds) — guard the parse.
 
 ## Data layout and facts
 
@@ -149,8 +154,9 @@ the 5th slot churns (STEAMBOAT → White_Tail → Avocado). Two clusters:
 Arizona/New Mexico ("Southwest") and Florida ("Southeast").
 
 **These config boxes are the source of truth.** The copies at
-`burned-area/output/*/fires.json` have data-derived extents with `-999.0`
-sentinel values — don't use them.
+`burned-area/output/*/fires.json` have data-derived extents that differ
+slightly from the config boxes (the pre-2026-07-21 copies also carried
+`-999.0` sentinel values) — don't use them.
 
 Region naming gotcha: naive "longitude < -100 ⇒ Arizona" mislabels the
 New Mexico fire (Sacaton, lon −108.7); use Southwest/Southeast region names.
@@ -159,11 +165,14 @@ New Mexico fire (Sacaton, lon −108.7); use Southwest/Southeast region names.
 
 CYGNSS L1 burned-area classifications, one file per fire-day. The columns that
 matter for mapping: `sp_lat`, `sp_lon` (specular point), `y_pred` (0/1 burned),
-`y_uncert` (0.14–0.8). ~11.3k records total over the window, ~51% classified
-burned; **168 rows carry −999.0 sentinel coordinates** and must be filtered.
+`y_uncert` (0–0.78). ⚠️ **The CSVs were all replaced 2026-07-21** (upstream
+re-sync): now 12,043 records over the window, ~18% classified burned, and
+**no −999.0 sentinel coordinates** (the earlier data had ~11.3k records,
+~51% burned, and 168 sentinel rows — keep the coordinate filter as a guard
+anyway; the console still applies it).
 
 ⚠️ These CSVs embed multi-line reflectivity matrices in quoted fields (files
-are 1.6–22 MB, ~800 MB total). Never count records with `wc -l`; parse with
+are 1.6–23 MB, ~810 MB total). Never count records with `wc -l`; parse with
 Python `csv` after `csv.field_size_limit(10**7)`.
 
 `prediction_info.txt` per day records the original processing paths.
@@ -195,8 +204,9 @@ days; only the rolling `prod_start/end_date` window changes. Output days
 **32-bit IEEE-float, DEFLATE-compressed, tiled (256×256)** GeoTIFF on the *same*
 USGS CONUS LAEA-sphere 1 km grid as the danger rasters (so `laea_grid`/
 `laea_inv`/`_warp_idx` are reused). NODATA = `-9999` marks pixels outside the
-retrieved footprint (the footprint is a small fraction of the box — NM ≈ 158
-valid px of 106×66). Values are volumetric soil moisture ≈ 0.05–0.15 m³/m³.
+retrieved footprint (the footprint is a small fraction of the box — NM has
+~95–266 valid px of 106×66 depending on the day). Values are volumetric
+soil moisture ≈ 0.05–0.15 m³/m³.
 ⚠️ Not the same layout as the danger tif — use `_parse_soil_tif` (handles
 tiles + deflate + float), not `_parse_tif`. `sample/output/soil_moisture.tif`
 is one example area tile.
@@ -209,9 +219,10 @@ against the **predicted** orbits in `orbits/` (per-day access/specular/
 propagation folders per satellite), *not* the actual orbits.
 
 - `CYG<norad>_plan.csv`: two `#` comment lines, then `second_of_day, Command`
-  rows — `RawIF` (~130–210 s/sat/day, measured 2026-07-16; an earlier note
-  claiming 2.4–2.8k was stale) plus `DNL: <station>` downlink rows
-  (~2.5–3.9k s/sat/day, stations AUS/HI/CHI, ~10 contiguous windows/sat/day).
+  rows — `RawIF` (69–226 s/sat/day, measured 2026-08-04: 113–226 within
+  20260630–0709, the 0710/0711 plans dip to 69; an earlier note claiming
+  2.4–2.8k was stale) plus `DNL: <station>` downlink rows
+  (~1.6–3.9k s/sat/day, stations AUS/HI/CHI, 7–16 contiguous windows/sat/day).
   Storage rates used by the demo: one obs fills 100/60 % of the 60-image
   buffer; one downlink second frees 100/1200 % (20 min empties a full
   buffer). Simulated per day from empty, buffers hit 100 % and the planner
@@ -226,7 +237,7 @@ propagation folders per satellite), *not* the actual orbits.
   into northern Mexico). `dshieldFire.lp`, `solution.sol`, logs = solver
   internals, unanalyzed. Target values from
   `dshield-demo-configuration/active-fire-priority-proxy/*/TV_ACTIVE_FIRE.csv`
-  (114,455 rows, GP-indexed).
+  (`GP index,values` header + 114,454 GP rows).
 
 ### `daily_fire_perimeters/YYYYMMDD/<Fire>.geojson`
 
@@ -268,7 +279,7 @@ section on top; sync docs below verified against the scripts). Facts:
   dshield-demo-config-YYYYMMDD.json` (20260618 → 20260714) map each
   component to its output path; **orbits/planner outputs go to the *next*
   day** (e.g. the 20260702 config writes `orbits/output/20260703/`).
-- `demo_overview.pdf` (repo root, untracked, added 2026-08-04): 3-page
+- `demo_overview.pdf` (repo root, committed 2026-08-04): 3-page
   NASA/ESTO demo deck — goals (automated observe→process→predict→task
   pipeline, TRL 5 exit), the 12-day window, 7-sat CYGNSS (commands produced
   but not executed), distributed execution over R2, module-flow diagram and
@@ -280,14 +291,16 @@ section on top; sync docs below verified against the scripts). Facts:
 ### `orbits-actual/specular_trajectory_YYYY-MM-DD.csv`
 
 **Actual** specular-point trajectories (vs the predicted `orbits/` used for
-planning), days **2026-06-30 → 2026-07-09** (~170 MB, ~1.19M rows/day).
+planning), days **2026-06-30 → 2026-07-11** (~170 MB, ~1.19M rows/day; the
+07-10 and 07-11 files landed 2026-07-17, after the original notes).
 Columns: `spacecraft, cygnss_norad, time` (UTC timestamp at 2 Hz, fixed
 layout — parse HH:MM:SS by slicing chars 11:19) then
 `sp_lat_chN, sp_lon_chN, norad_chN` for channels 1–4 (norad_chN = the GPS
 transmitter, not the CYGNSS sat). Join to plans on `cygnss_norad` +
 floor(second-of-day). RawIF-animatable days = plans ∩ trajectories =
-**20260630 → 20260709** (console days 06-29 and 07-10 show "no
-plan/trajectory" in the HUD).
+**20260630 → 20260711** (of the console's config-day window only 06-29
+shows "no plan/trajectory" in the HUD; 07-11 has RawIF data but sits
+outside the console timeline, which ends at the last config day 07-10).
 
 Facts worth keeping (measured 2026-07-15): a commanded RawIF second captures
 **all 4 channels**, but only some sit over the intended targets — the rest

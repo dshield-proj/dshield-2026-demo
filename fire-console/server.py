@@ -17,6 +17,8 @@ Environment:
     FIRE_CONFIG_ROOT  tasking configs (default: ../dshield-demo-configuration/burned-area-config)
     FIRE_DETECT_ROOT  detection CSVs  (default: ../burned-area/output)
     FIRE_DANGER_ROOT  WFPI danger zips (default: ../fire-danger/output)
+    FIRE_SOIL_ROOT    soil-moisture GeoTIFFs (default: ../soil-moisture/output)
+    FIRE_SOIL_CONFIG_ROOT  sm_areas.json boxes (default: ../dshield-demo-configuration/soil-moisture-config)
     FIRE_PLAN_ROOT    RawIF plan CSVs (default: ../planner/output)
     FIRE_ORBIT_ROOT   specular trajectories (default: ../orbits-actual)
 """

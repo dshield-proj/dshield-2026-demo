@@ -64,12 +64,13 @@ automatically.
 | `GET /api/danger?day=YYYYMMDD&view=conus` | WFPI Day-1 danger raster as a transparent indexed PNG, warped into the console's Albers map space (rect published in the bundle's `danger.rect`) |
 | `GET /api/danger?day=YYYYMMDD&view=geo&bbox=lonMin,lonMax,latMin,latMax&w=600` | same raster over a plain lon/lat rectangle (used by the zoom insets) |
 | `GET /api/soil?day=YYYYMMDD&area=N&bbox=lonMin,lonMax,latMin,latMax&w=320` | soil-moisture retrieval for one fixed area warped into a lon/lat rectangle, as a transparent indexed PNG (dry→wet colormap) |
-| `GET /api/rawif?day=YYYYMMDD` | one day's RawIF track: time-sorted arrays `{t, lat, lon}` (t = UTC second of day) of all 4 channels' actual specular points at the planner's commanded RawIF seconds, unfiltered; plus a `storage` block — per-satellite storage-% breakpoints `lv[i] = {t, v}` simulated from the plan (+1/60 buffer per obs, −1/1200 per downlink second, clamped 0–100) and downlink windows `dnl = [[t0, t1, satIdx, stationIdx], …]` over `stations` (AUS/HI/CHI); served gzipped |
+| `GET /api/rawif?day=YYYYMMDD` | one day's RawIF track: time-sorted arrays `{t, lat, lon, s}` (t = UTC second of day; `s` = per-point index into `sats`, the NORAD id list) of all 4 channels' actual specular points at the planner's commanded RawIF seconds, unfiltered; plus a `storage` block — per-satellite storage-% breakpoints `lv[i] = {t, v}` simulated from the plan (+1/60 buffer per obs, −1/1200 per downlink second, clamped 0–100) and downlink windows `dnl = [[t0, t1, satIdx, stationIdx], …]` over `stations` (AUS/HI/CHI); served gzipped |
 | `GET /` , `GET /static/conus.json` | the page and the CONUS state outlines |
 
 Parsed CSVs are cached in memory keyed by file mtime, so the multi-MB files are
 only re-read when they change. Records with `-999` sentinel coordinates are
-excluded (168 of 11,256 in the current data).
+excluded as a guard (none in the current data — the 2026-07-21 refresh of the
+detection CSVs removed the 168 present earlier).
 
 The danger rasters are read from `wfpi_YYYYMMDD_Day1.zip` (one 8-bit palette
 GeoTIFF each, 1 km USGS LAEA CONUS grid) with a stdlib-only TIFF parser and
@@ -107,17 +108,20 @@ over each tasking box) shown in the roster, tooltips and detail view.
   day's commanded RawIF captures as black dots (light ink in dark theme) at the
   actual specular-point locations — a clock sweeps the UTC day at 1440× (24 h ≙
   60 s), each dot lingering ~25 min of day-time with an age fade, and idle gaps
-  between passes are skipped (a HUD pill shows the sweep clock and pass n/m,
-  with a pause/resume button that freezes the sweep on the current frame —
-  the paused state carries across day changes until resumed).
+  between passes are skipped. A HUD pill shows the sweep clock and pass n/m
+  plus a transport: pause/resume, previous/next pass, ±15 min rewind and
+  fast-forward, a scrub slider over the day's passes (idle gaps compressed out
+  of its range), and a speed cycle ¼×–4× on the base rate (paused state and
+  speed carry across day changes for the session). Each satellite's newest
+  visible dot is tagged with its CYGNSS NORAD id.
   Built by joining `planner/output`'s per-satellite RawIF command seconds
   against `orbits-actual`'s 2 Hz *actual* specular trajectories — all 4
   channels per satellite, first sample per second, deliberately unfiltered:
   a commanded second captures the whole receiver, so channels whose specular
   point falls outside CONUS (Gulf, Mexico, ocean) are shown as flown.
   ~170 MB CSV streamed once per day, cached gzipped by input mtimes
-  (~1.2 s cold). Days with no plan+trajectory pair (2026-06-29, 07-10) say
-  so in the HUD.
+  (~1.2 s cold). Days with no plan+trajectory pair (only 2026-06-29 in the
+  current data) say so in the HUD.
 - **Fleet ops strip** (shows with the RawIF sweep, under the CONUS map):
   seven vertical storage bars — one per CYGNSS satellite — animate each
   buffer filling as RawIF observations are taken (1/60 of the 60-image

@@ -43,7 +43,7 @@ Usage:
 
 Needs numpy + matplotlib (+ imageio-ffmpeg for MP4); the repo data needs a day
 present in all three of planner/output, orbits/output and orbits-actual
-(20260630..20260709).
+(20260630..20260711).
 """
 
 import argparse
@@ -610,7 +610,7 @@ def main():
     dash = f"{day[:4]}-{day[4:6]}-{day[6:]}"
     if not os.path.exists(f"{BASE}/orbits-actual/specular_trajectory_{dash}.csv"):
         sys.exit(f"missing orbits-actual/specular_trajectory_{dash}.csv "
-                 "(actual data covers 2026-06-30..2026-07-09)")
+                 "(actual data covers 2026-06-30..2026-07-11)")
 
     if args.bbox:
         la0, la1, lo0, lo1 = args.bbox
