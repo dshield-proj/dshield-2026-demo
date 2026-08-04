@@ -24,7 +24,7 @@ No dependencies. Options via environment variables:
 | `FIRE_SOIL_ROOT` | `../soil-moisture/output` | daily `soil_moisture_area_id_N.tif` retrievals (two fixed areas) |
 | `FIRE_SOIL_CONFIG_ROOT` | `../dshield-demo-configuration/soil-moisture-config` | `sm_areas.json` area boxes |
 | `FIRE_PLAN_ROOT` | `../planner/output` | daily `CYG<norad>_plan.csv` RawIF command plans |
-| `FIRE_ORBIT_ROOT` | `../orbits_actual` | `specular_trajectory_YYYY-MM-DD.csv` 2 Hz *actual* specular-point trajectories |
+| `FIRE_ORBIT_ROOT` | `../orbits-actual` | `specular_trajectory_YYYY-MM-DD.csv` 2 Hz *actual* specular-point trajectories |
 | `FIRE_TOKEN` | *(empty = no auth)* | optional; not needed over an SSH tunnel. If set, every request must carry `?token=...` or `Authorization: Bearer ...` |
 
 ## Viewing from your laptop (SSH tunnel to the EC2 machine)
@@ -111,7 +111,7 @@ over each tasking box) shown in the roster, tooltips and detail view.
   with a pause/resume button that freezes the sweep on the current frame —
   the paused state carries across day changes until resumed).
   Built by joining `planner/output`'s per-satellite RawIF command seconds
-  against `orbits_actual`'s 2 Hz *actual* specular trajectories — all 4
+  against `orbits-actual`'s 2 Hz *actual* specular trajectories — all 4
   channels per satellite, first sample per second, deliberately unfiltered:
   a commanded second captures the whole receiver, so channels whose specular
   point falls outside CONUS (Gulf, Mexico, ocean) are shown as flown.

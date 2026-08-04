@@ -11,7 +11,7 @@ the animation shows, inside the region:
   - every predicted specular point (orbits/output/<day>/CYG<norad>/specular/
     specular.csv — the planning-time orbit prediction, all visible GPS
     transmitters) as a filled blue dot,
-  - every actually recorded specular point (orbits_actual/
+  - every actually recorded specular point (orbits-actual/
     specular_trajectory_YYYY-MM-DD.csv, first 2 Hz sample per second, top-4
     channels by signal strength) as a filled green dot,
   - a connecting line between each matched pair (same satellite + second +
@@ -42,7 +42,7 @@ Usage:
   python3 helper_scripts/rawif_pred_vs_actual_anim.py 20260702 --preview  # 3 stills, no video
 
 Needs numpy + matplotlib (+ imageio-ffmpeg for MP4); the repo data needs a day
-present in all three of planner/output, orbits/output and orbits_actual
+present in all three of planner/output, orbits/output and orbits-actual
 (20260630..20260709).
 """
 
@@ -125,7 +125,7 @@ def load_actual(day, plans):
     """{(norad, sec): [(gps_norad, lat, lon), ...]} — first 2 Hz sample of each
     commanded second, all 4 channels (channels with empty fields dropped)."""
     dash = f"{day[:4]}-{day[4:6]}-{day[6:]}"
-    path = f"{BASE}/orbits_actual/specular_trajectory_{dash}.csv"
+    path = f"{BASE}/orbits-actual/specular_trajectory_{dash}.csv"
     act = {}
     with open(path) as f:
         f.readline()
@@ -608,8 +608,8 @@ def main():
         if not os.path.isdir(f"{BASE}/{req}"):
             sys.exit(f"missing {req}")
     dash = f"{day[:4]}-{day[4:6]}-{day[6:]}"
-    if not os.path.exists(f"{BASE}/orbits_actual/specular_trajectory_{dash}.csv"):
-        sys.exit(f"missing orbits_actual/specular_trajectory_{dash}.csv "
+    if not os.path.exists(f"{BASE}/orbits-actual/specular_trajectory_{dash}.csv"):
+        sys.exit(f"missing orbits-actual/specular_trajectory_{dash}.csv "
                  "(actual data covers 2026-06-30..2026-07-09)")
 
     if args.bbox:

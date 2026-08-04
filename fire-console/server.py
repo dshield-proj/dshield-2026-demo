@@ -18,7 +18,7 @@ Environment:
     FIRE_DETECT_ROOT  detection CSVs  (default: ../burned-area/output)
     FIRE_DANGER_ROOT  WFPI danger zips (default: ../fire-danger/output)
     FIRE_PLAN_ROOT    RawIF plan CSVs (default: ../planner/output)
-    FIRE_ORBIT_ROOT   specular trajectories (default: ../orbits_actual)
+    FIRE_ORBIT_ROOT   specular trajectories (default: ../orbits-actual)
 """
 import array
 import csv
@@ -48,7 +48,7 @@ SOIL_CONFIG_ROOT = os.environ.get(
     "FIRE_SOIL_CONFIG_ROOT",
     os.path.join(DEMO, "dshield-demo-configuration", "soil-moisture-config"))
 PLAN_ROOT = os.environ.get("FIRE_PLAN_ROOT", os.path.join(DEMO, "planner", "output"))
-ORBIT_ROOT = os.environ.get("FIRE_ORBIT_ROOT", os.path.join(DEMO, "orbits_actual"))
+ORBIT_ROOT = os.environ.get("FIRE_ORBIT_ROOT", os.path.join(DEMO, "orbits-actual"))
 TOKEN = os.environ.get("FIRE_TOKEN", "")
 PORT = int(os.environ.get("PORT", "8000"))
 
@@ -826,7 +826,7 @@ def build_soil_info(dates):
 
 # ------------------------------------------------------ RawIF pass track
 # planner/output/YYYYMMDD/CYG<norad>_plan.csv lists the seconds-of-day (UTC)
-# each CYGNSS satellite is commanded into RawIF capture; orbits_actual/
+# each CYGNSS satellite is commanded into RawIF capture; orbits-actual/
 # specular_trajectory_YYYY-MM-DD.csv carries the day's *actual* 2 Hz
 # specular-point locations (4 channels per satellite). A day's "RawIF track"
 # is every channel's actual specular point at each commanded second — all 4

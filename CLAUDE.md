@@ -3,9 +3,9 @@
 Working notes for this folder. Work done July 13–17, 2026 (Claude-assisted):
 analysis and visualization of the burned-area tasking campaign, plus the
 fire-danger (WFPI Day-1), soil-moisture, and RawIF-sweep (planner ×
-orbits_actual) layers. `orbits/` holds the **predicted** orbits the plan was
-built on; `orbits_actual/` holds the **actual** orbits. The console uses
-`planner/output`'s `*_plan.csv` + `orbits_actual/`; `*_choices.txt`,
+orbits-actual) layers. `orbits/` holds the **predicted** orbits the plan was
+built on; `orbits-actual/` holds the **actual** orbits. The console uses
+`planner/output`'s `*_plan.csv` + `orbits-actual/`; `*_choices.txt`,
 `orbits/Grid.csv`, and the TV files are analyzed and documented below but not
 used by the console; solver internals and the per-satellite `orbits/output`
 access predictions are unanalyzed (the specular predictions are analyzed —
@@ -128,7 +128,7 @@ Predicted specular format (`orbits/output/YYYYMMDD/CYG<norad>/specular/
 specular.csv`, ~47 MB/sat/day): 5 header lines then
 `time index,source id,lat [deg],lon [deg],rank` — time index = second-of-day
 0…86400, `source id` = `GNSS<gps-norad>` (matches `norad_chN` in
-`orbits_actual`), **lon is 0–360** (normalize!), `rank` is always empty, rows
+`orbits-actual`), **lon is 0–360** (normalize!), `rank` is always empty, rows
 are **grouped by transmitter, not time-sorted** (never early-break a scan).
 Measured 2026-07-02: offsets median 1.4 km / max 3.8 km — early-day passes sit
 ~1.3 km east of prediction, the late-day passes (after the day's 14 h idle
@@ -241,7 +241,7 @@ single perimeter starts 07-02; Avocado's starts 07-08; Shell's is ~20–31 days
 stale (contained, last record 06-09). Don't trust `poly_PolygonDateTime`
 (nulls + year typos) — see the folder README.
 
-### `orbits_actual/specular_trajectory_YYYY-MM-DD.csv`
+### `orbits-actual/specular_trajectory_YYYY-MM-DD.csv`
 
 **Actual** specular-point trajectories (vs the predicted `orbits/` used for
 planning), days **2026-06-30 → 2026-07-09** (~170 MB, ~1.19M rows/day).

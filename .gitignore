@@ -18,6 +18,6 @@ orbits/*
 planner/*
 dshield-demo-configuration/*
 dshield-demo-bucket/*
-orbits_actual/*
+orbits-actual/*
 helper_scripts/output/*
 daily_fire_perimeters/*
