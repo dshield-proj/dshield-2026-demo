@@ -1,6 +1,7 @@
-# demo_analysis — DShield 2026 fire demo
+# DShield 2026 fire demo
 
-Working notes for this folder. Work done July 13–17, 2026 (Claude-assisted):
+Working notes for this folder. Work done July 13–21 and Aug 4, 2026
+(Claude-assisted):
 analysis and visualization of the burned-area tasking campaign, plus the
 fire-danger (WFPI Day-1), soil-moisture, and RawIF-sweep (planner ×
 orbits-actual) layers. `orbits/` holds the **predicted** orbits the plan was
@@ -240,6 +241,41 @@ in any NIFC service** — only `Rookery_incident_point.geojson`; White_Tail's
 single perimeter starts 07-02; Avocado's starts 07-08; Shell's is ~20–31 days
 stale (contained, last record 06-09). Don't trust `poly_PolygonDateTime`
 (nulls + year typos) — see the folder README.
+
+### Root sync scripts, R2 buckets, and docs (verified 2026-08-04)
+
+The demo's modules ran on different machines and exchanged all data via
+**Cloudflare R2 buckets**; the root scripts sync them ↔ local disk.
+`README.md` was rewritten 2026-08-04 (project overview + fire-console run
+section on top; sync docs below verified against the scripts). Facts:
+
+- `sync_read_all.py` downloads **only the `read_only` buckets** in
+  `cloudflare_r2.json` (rclone copy — remotes never modified, local extras
+  kept); read-write buckets are left untouched, and are seeded from remote
+  on the first `sync_rw.py` run if the local dir is missing. `sync_rw.py`
+  uploads via rclone copy (no remote deletes) unless `--delete` (rclone
+  sync). `setup.py` writes the `r2-rw`/`r2-ro` remotes into
+  `~/.config/rclone/rclone.conf`, preserving unrelated remotes.
+  `cloudflare_r2.json` is gitignored; format in `cloudflare_r2_template.json`.
+- The **fire-arrival and pre-fire-priority buckets exist on Cloudflare but
+  may not be synced locally** (user, 2026-08-04) — their absence on a given
+  machine is expected; don't flag it or drop them from docs.
+- Naming gotchas: the config bucket's planner folder is `planner_config`
+  (underscore; files inside are `planner-config-YYYYMMDD.json`), vs
+  `burned-area-config`/`soil-moisture-config` (hyphens). Local folder and
+  config paths use `burned-area` (hyphen), not `burned_area`.
+- Daily master configs `dshield-demo-configuration/
+  dshield-demo-config-YYYYMMDD.json` (20260618 → 20260714) map each
+  component to its output path; **orbits/planner outputs go to the *next*
+  day** (e.g. the 20260702 config writes `orbits/output/20260703/`).
+- `demo_overview.pdf` (repo root, untracked, added 2026-08-04): 3-page
+  NASA/ESTO demo deck — goals (automated observe→process→predict→task
+  pipeline, TRL 5 exit), the 12-day window, 7-sat CYGNSS (commands produced
+  but not executed), distributed execution over R2, module-flow diagram and
+  daily UTC timeline (00 UTC active-fire priority proxy; soil-moisture +
+  burned-area until ~14 UTC; orbits 14 UTC; planner 17 UTC; fire-danger +
+  pre-fire priority 19 UTC; fire-arrival/WRF-SFIRE run post-demo). Same
+  content family as the `Presentation1.pdf` behind the workflow banner.
 
 ### `orbits-actual/specular_trajectory_YYYY-MM-DD.csv`
 

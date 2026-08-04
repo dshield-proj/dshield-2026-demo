@@ -9,7 +9,7 @@ timeline grows within ~5 seconds; delete one and it shrinks.
 ## Run
 
 ```bash
-cd demo_analysis/fire-console
+cd fire-console
 python3 server.py            # → http://localhost:8000
 ```
 

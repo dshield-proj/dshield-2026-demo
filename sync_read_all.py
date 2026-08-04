@@ -1,5 +1,5 @@
 from rclone_r2 import sync_read_all
 
-# Download: copy all buckets (read-only and read-write) → local directories
-# (remotes are never modified)
+# Download: copy the read-only buckets → local directories
+# (read-write buckets are left untouched; remotes are never modified)
 sync_read_all()
