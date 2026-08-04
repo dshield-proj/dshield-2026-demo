@@ -1097,7 +1097,7 @@ def build_bundle():
                 "lat_u": round(f["lat_upper"], 4), "lat_l": round(f["lat_lower"], 4),
                 "lon_u": round(f["lon_upper"], 4), "lon_l": round(f["lon_lower"], 4),
                 "clat": round(clat, 4), "clon": round(clon, 4),
-                "region": reg, "fire_start": f["fire_start_date"],
+                "region": reg, "fire_start": f.get("fire_start_date"),
                 "n_obs": det["n"] if det else None,
                 "n_burned": det["n_burned"] if det else None,
             })

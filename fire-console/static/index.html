@@ -742,7 +742,7 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
       + `<div class="tt-row"><b>${REG[f.region].name}</b> · ${f.days_count} day${f.days_count > 1 ? "s" : ""} tasked</div>`
       + (s ? `<div class="tt-row">${fmtShort(B.dates[dayIdx])}: ${s[0]} obs · ${s[1]} burned (${Math.round(100 * s[1] / s[0])}%)</div>` : `<div class="tt-row">no detections this day</div>`)
       + (dv != null ? `<div class="tt-row"><span class="dsq" style="background:${dangerColor(dv)}"></span>WFPI Day-1 danger ${dv}</div>` : "")
-      + `<div class="tt-row">fire start ${f.fire_start}</div>`
+      + (f.fire_start ? `<div class="tt-row">fire start ${f.fire_start}</div>` : "")
       + `<div class="tt-row">click for detection detail</div>`;
   }
 
@@ -2004,7 +2004,7 @@ input[type="range"].scrub:focus-visible { box-shadow: 0 0 0 3px var(--ember-glow
         <div class="ttl"><span class="sw" style="background:${col}"></span><h2>${esc(f.name.replace(/_/g, " "))}</h2></div>
         <button class="close-btn" id="det-close" aria-label="Close">✕</button>
       </div>
-      <div class="detail-meta">${REG[f.region].name} · fire start ${f.fire_start} · ${f.days_count} days on watchlist · IRWIN ${esc(f.id)}${dvd != null ? ` · WFPI Day-1 danger ${dvd} (${fmtShort(B.dates[cur])})` : ""}</div>
+      <div class="detail-meta">${REG[f.region].name}${f.fire_start ? ` · fire start ${f.fire_start}` : ""} · ${f.days_count} days on watchlist · IRWIN ${esc(f.id)}${dvd != null ? ` · WFPI Day-1 danger ${dvd} (${fmtShort(B.dates[cur])})` : ""}</div>
       <div class="detail-controls">
         <div class="modes" role="group" aria-label="Detection display mode">
           <button id="mode-day" aria-pressed="${detailMode === "day"}">Selected day</button>
